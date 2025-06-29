@@ -1,18 +1,14 @@
-import psycopg2 
-from psycopg2.extras import RealDictCursor
 import os
-import time
 from dotenv import load_dotenv
-load_dotenv()
 
-while True:
-    try: 
-        conn = psycopg2.connect(host='localhost', database='mmun', user='postgres', password=os.getenv("DB_PASSWORD"), cursor_factory=RealDictCursor)
-        conn.autocommit = True
-        cursor = conn.cursor()
-        print("Connected to db testdb")
-        break
-    except Exception as error:
-        print("Task Failed")
-        print("Error: ", error)
-        time.sleep(2)
+load_dotenv()
+from functools import lru_cache
+import psycopg
+from psycopg_pool import ConnectionPool, AsyncConnectionPool
+
+conninfo = f"host='localhost' dbname='mmun' user='postgres' password={os.getenv("DB_PASSWORD")}"
+
+
+@lru_cache()
+def get_async_pool():
+    return AsyncConnectionPool(conninfo=conninfo)

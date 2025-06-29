@@ -9,3 +9,5 @@ class Country(BaseModel):
     delegate2: Optional[str] = None
     delegate3: Optional[str] = None
     delegate4: Optional[str] = None
+    role: str = "member"
+    login: str
