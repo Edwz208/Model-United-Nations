@@ -8,6 +8,8 @@ from random import randrange
 import time
 from db import get_async_pool
 from psycopg.rows import dict_row
+from authentication import hash
+
 
 pool = get_async_pool()
 router = APIRouter()
@@ -19,7 +21,7 @@ def sanitizeKey(key):
 
 async def uniqueLogin():
     while True:
-        randomNum = str(randrange(100000, 1000000))
+        randomNum = await hash(str(randrange(100000, 1000000)))
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute(
@@ -47,6 +49,7 @@ async def sheetExport():
         async with conn.cursor(row_factory=dict_row) as cursor:
             for row in data:
                 del row["school"]
+                row["role"] = "member"
                 await cursor.execute(
                     """INSERT INTO delegates (country, delegate1, delegate2, delegate3, delegate4, login, role) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (country) DO UPDATE
                     SET delegate1 = EXCLUDED.delegate1,
@@ -69,7 +72,7 @@ async def sheetExport():
         return data
 
 
-@router.get("/get-countries")
+@router.get("/get-countries", status_code = status.HTTP_200_OK)
 async def getAll():
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
@@ -111,6 +114,7 @@ async def deleteCountry(country: str):
 async def oneCountry(country: Country):
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
+            country.login = await hash(country.login)
             await cursor.execute('''INSERT INTO delegates (country, delegate1, delegate2, delegate3, delegate4, role, login) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (country)
                            DO UPDATE SET delegate1 = EXCLUDED.delegate1, delegate2 = EXCLUDED.delegate2, delegate3 = EXCLUDED.delegate3, delegate4 = EXCLUDED.delegate4, role = EXCLUDED.role, login = EXCLUDED.login RETURNING *;''',
                            (country.assigned_country, country.delegate1,country.delegate2,country.delegate3,country.delegate4,country.role,country.login))
