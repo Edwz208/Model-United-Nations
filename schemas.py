@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 class User(BaseModel):
     code: str
+    country: str
     
 class Country(BaseModel):
     assigned_country: str

@@ -3,8 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 from functools import lru_cache
-import psycopg
-from psycopg_pool import ConnectionPool, AsyncConnectionPool
+from psycopg_pool import AsyncConnectionPool
 
 conninfo = f"host='localhost' dbname='mmun' user='postgres' password={os.getenv("DB_PASSWORD")}"
 

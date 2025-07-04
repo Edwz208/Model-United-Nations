@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 import csv
 import requests
 import io
@@ -8,7 +8,10 @@ from random import randrange
 import time
 from db import get_async_pool
 from psycopg.rows import dict_row
-from authentication import hash
+from authentication import hash, get_current_user
+from typing import Annotated
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 pool = get_async_pool()
@@ -34,42 +37,49 @@ async def uniqueLogin():
 
 
 @router.get("/sheet-export")
-async def sheetExport():
-    url = os.getenv("SPREADSHEET")
-    response = requests.get(url)
-    csvString = response.text
-    f = io.StringIO(csvString)
-    firstLine = next(f)
-    rawKeys = firstLine.strip().split(",")
-    sanitizedKeys = [sanitizeKey(name) for name in rawKeys]
-    reader = csv.DictReader(f, fieldnames=sanitizedKeys)
-    data = list(reader)
-    print(data)
-    async with pool.connection() as conn:
-        async with conn.cursor(row_factory=dict_row) as cursor:
-            for row in data:
-                del row["school"]
-                row["role"] = "member"
-                await cursor.execute(
-                    """INSERT INTO delegates (country, delegate1, delegate2, delegate3, delegate4, login, role) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (country) DO UPDATE
-                    SET delegate1 = EXCLUDED.delegate1,
-                    delegate2 = EXCLUDED.delegate2,
-                    delegate3 = EXCLUDED.delegate3,
-                    delegate4 = EXCLUDED.delegate4,
-                    login = CASE WHEN delegates.login IS NULL OR delegates.login = '' THEN EXCLUDED.login
-                    ELSE delegates.login END,
-                    role = EXCLUDED.role;""",
-                    (
-                        row["assigned_country"],
-                        row["delegate_1"],
-                        row["delegate_2"],
-                        row["delegate_3"],
-                        row["delegate_4"],
-                        await uniqueLogin(),
-                        "member",
-                    ),
-                )
-        return data
+async def sheetExport(token: Annotated[str, Depends(oauth2_scheme)]):
+    payload = get_current_user(token)
+    if payload.get("role").equals("member"):
+        url = os.getenv("SPREADSHEET")
+        response = requests.get(url)
+        csvString = response.text
+        f = io.StringIO(csvString)
+        firstLine = next(f)
+        rawKeys = firstLine.strip().split(",")
+        sanitizedKeys = [sanitizeKey(name) for name in rawKeys]
+        reader = csv.DictReader(f, fieldnames=sanitizedKeys)
+        data = list(reader)
+        print(data)
+        async with pool.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as cursor:
+                for row in data:
+                    del row["school"]
+                    row["role"] = "member"
+                    await cursor.execute(
+                        """INSERT INTO delegates (country, delegate1, delegate2, delegate3, delegate4, login, role) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (country) DO UPDATE
+                        SET delegate1 = EXCLUDED.delegate1,
+                        delegate2 = EXCLUDED.delegate2,
+                        delegate3 = EXCLUDED.delegate3,
+                        delegate4 = EXCLUDED.delegate4,
+                        login = CASE WHEN delegates.login IS NULL OR delegates.login = '' THEN EXCLUDED.login
+                        ELSE delegates.login END,
+                        role = EXCLUDED.role;""",
+                        (
+                            row["assigned_country"],
+                            row["delegate_1"],
+                            row["delegate_2"],
+                            row["delegate_3"],
+                            row["delegate_4"],
+                            await uniqueLogin(),
+                            "member",
+                        ),
+                    )
+            return data
+    else:
+        raise HTTPException(
+            status_code = status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized page"
+            )
 
 
 @router.get("/get-countries", status_code = status.HTTP_200_OK)
