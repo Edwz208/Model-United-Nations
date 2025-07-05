@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, status, HTTPException, Response
 from authentication import verify, generateJwt
 from schemas import User
 from db import get_async_pool
@@ -12,7 +12,7 @@ roleList = {"member": 2007, "admin": 4015}
 
 
 @router.post("/login", status_code=status.HTTP_202_ACCEPTED)
-async def login(user: User):
+async def login(user: User, response: Response):
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
             user.country = user.country.lower().capitalize()
@@ -28,5 +28,5 @@ async def login(user: User):
                 )
             del returned_info["login"]
             returned_info["role"] = [roleList[returned_info["role"]]]
-            returned_info.update({"accessToken": generateJwt(returned_info)})
+            returned_info.update({"accessToken": generateJwt(returned_info, response)})
             return returned_info
