@@ -15,14 +15,13 @@ class Country(BaseModel):
     
 class Resolution(BaseModel):
     title: str
-    number: str
+    number: int
     council: int
     status: str
     clauses: int
     submitter: str
     seconder: str
     negator: str
-    id: int
     
 
 class Exec(BaseModel):

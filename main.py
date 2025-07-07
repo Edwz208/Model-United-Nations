@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import countryData, login
+from routers import countryData, login, resolutionsData
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv, find_dotenv
 from db import get_async_pool
@@ -8,14 +8,14 @@ import asyncio
 import authentication
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
+from fastapi.staticfiles import StaticFiles
 
-app = FastAPI()
+
 async_pool = get_async_pool()
-
 origins = [
     "http://localhost:8000",
     "http://localhost:5173",
-]
+]   
 
 async def check_async_connections():
     while True:
@@ -42,7 +42,9 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
+app.mount("/resolutions", StaticFiles(directory="uploads/resolutions"), name="pdfs")
 
 app.include_router(login.router)
 app.include_router(countryData.router)
 app.include_router(authentication.router)
+app.include_router(resolutionsData.router)

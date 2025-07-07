@@ -11,7 +11,7 @@ from db import get_async_pool
 from psycopg.rows import dict_row
 from authentication import hash, get_current_user
 from typing import Annotated
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 

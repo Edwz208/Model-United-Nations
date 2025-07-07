@@ -8,6 +8,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 load_dotenv()
 from fastapi import Depends, APIRouter, HTTPException, status, Response, Request
+from psycopg.rows import dict_row
+from db import get_async_pool
+
+
+pool = get_async_pool()
 
 roleList = {
   "member": 2007,
@@ -42,8 +47,7 @@ def generateJwt(data: dict, response: Response):
 def get_current_user(token: str):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+        detail="Could not validate credentials"
     )
     try: 
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -56,21 +60,40 @@ def get_current_user(token: str):
         raise credentials_exception
     
 router = APIRouter()
+adminPaths = ["countries, resolutions, amendments, projection-dashboard"]
 
-
+async def getCountryNames():
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cursor:
+            await cursor.execute("""SELECT country from delegates""")
+            allCount = await cursor.fetchall()
+            return allCount
+        
+        
+async def getResolutions():
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cursor:
+            await cursor.execute('''SELECT number, title, clauses, council_id, submitter, seconder, negator, url from resolutions''')
+            allResolutions = await cursor.fetchall()
+            return allResolutions
+        
 @router.get("/refresh")
-def refresh_token(request: Request):
+async def refresh_token(request: Request, pathName = str ):
     token = request.cookies.get("refresh_token")
     if token:
+        task = asyncio.create_task(getResolutions())
+        task1 = asyncio.create_task(getCountryNames())
         token = token.replace("Bearer ", "")
         payload = jwt.decode(token, REFRESH_KEY, algorithms=[ALGORITHM])
         payload["exp"] = datetime.now(timezone.utc) + timedelta(minutes=15)
         newAccess = jwt.encode(payload, SECRET_KEY, algorithm = ALGORITHM)
-        return {"accessToken": newAccess, "role": payload["role"], "country": payload["country"]}
+        await task
+        await task1
+        return {"accessToken": newAccess, "role": payload["role"], "country": payload["country"], "countryNames": task1, "resolutions": task}
     else:
         raise HTTPException(status_code=401, detail="Missing access token")
     
-    
+    # for sure need country names 
 @router.post("/logout")
 def logout(response: Response):
     response.delete_cookie(key="refresh_token", httponly=True)
