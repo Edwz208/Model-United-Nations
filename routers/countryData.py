@@ -4,6 +4,7 @@ import requests
 import io
 import os
 from schemas import Country
+from schemas import Exec
 from random import randrange
 import time
 from db import get_async_pool
@@ -129,3 +130,21 @@ async def oneCountry(country: Country):
                            DO UPDATE SET delegate1 = EXCLUDED.delegate1, delegate2 = EXCLUDED.delegate2, delegate3 = EXCLUDED.delegate3, delegate4 = EXCLUDED.delegate4, role = EXCLUDED.role, login = EXCLUDED.login RETURNING *;''',
                            (country.assigned_country, country.delegate1,country.delegate2,country.delegate3,country.delegate4,country.role,country.login))
             return await cursor.fetchone()
+
+@router.post("/set-exec", status_code = status.HTTP_200_OK)
+async def setExec(person: Exec):
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cursor:
+            await cursor.execute('''INSERT INTO secretariat (name, position) VALUES (%s,%s) ON CONFLICT (name)
+                           DO UPDATE SET name = EXCLUDED.name, position = EXCLUDED.position RETURNING *;''',
+                           (person.name, person.position))
+            return await cursor.fetchone()
+        
+@router.get("/get-secretariat", status_code = status.HTTP_200_OK)
+async def getAll():
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cursor:
+            await cursor.execute("""SELECT * from secretariat""")
+            allCount = await cursor.fetchall()
+            return allCount
+        
