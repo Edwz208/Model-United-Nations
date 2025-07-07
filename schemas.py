@@ -12,3 +12,7 @@ class Country(BaseModel):
     delegate4: Optional[str] = None
     role: str = "member"
     login: str
+
+class Exec(BaseModel):
+    name: str
+    position: str
