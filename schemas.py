@@ -12,3 +12,15 @@ class Country(BaseModel):
     delegate4: Optional[str] = None
     role: str = "member"
     login: str
+    
+class Resolution(BaseModel):
+    title: str
+    number: str
+    council: int
+    status: str
+    clauses: int
+    submitter: str
+    seconder: str
+    negator: str
+    id: int
+    
