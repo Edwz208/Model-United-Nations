@@ -24,3 +24,7 @@ class Resolution(BaseModel):
     negator: str
     id: int
     
+
+class Exec(BaseModel):
+    name: str
+    position: str
