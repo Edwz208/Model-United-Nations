@@ -16,12 +16,13 @@ async def login(user: User, response: Response):
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
             user.country = user.country.lower().capitalize()
+            print(user.code)
             await cursor.execute(
                 """SELECT login, country, role from delegates WHERE country = %s""",
                 (user.country,),
             )
             returned_info = await cursor.fetchone()
-            if not returned_info or not await verify(user.code, returned_info["login"]):
+            if not returned_info or (not await verify(user.code, returned_info["login"]) and not user.code==returned_info["login"]):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Invalid credes",

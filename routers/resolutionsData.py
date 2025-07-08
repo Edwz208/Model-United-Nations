@@ -8,11 +8,11 @@ from pathlib import Path
 from uuid import uuid4
 import re
 
+
 def sanitize_filename(name: str) -> str:
     return re.sub(r'[^\w\-.]', '_', name)
 
 pool = get_async_pool()
-
 router = APIRouter()
 
 @router.post('/upload-resolution',status_code = status.HTTP_200_OK)

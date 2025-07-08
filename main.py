@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from routers import countryData, login, resolutionsData
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv, find_dotenv
@@ -6,9 +6,14 @@ from db import get_async_pool
 from contextlib import asynccontextmanager
 import asyncio
 import authentication
+from authentication import get_current_user
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 from fastapi.staticfiles import StaticFiles
+from typing import List, Annotated
+import json
+from fastapi.security import OAuth2PasswordBearer
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 async_pool = get_async_pool()
@@ -23,7 +28,6 @@ async def check_async_connections():
         print("check async connections health")
         await async_pool.check()
         
-
 @asynccontextmanager
 async def lifespan_handler(app: FastAPI):
     await get_async_pool().open()
@@ -42,6 +46,51 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
+
+class ConnectionManager:
+    def __init__(self) -> None:
+        self.active_connections: List[WebSocket] = []
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        
+    async def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+        
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+        
+    async def broadcast(self, message: str):
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception as e:
+                disconnected.append(connection)
+        for conn in disconnected:
+            if conn in self.active_connections:
+                self.active_connections.remove(conn)
+    
+manager = ConnectionManager()
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try: 
+        while True:
+            data = await websocket.receive_text()
+            token = data.get("accessToken")
+            payload = get_current_user(token)
+            if payload.get("role") == 4015:
+                message = {"message": data}
+                manager.broadcast(json.dumps(message))
+            else:
+                manager.send_personal_message({"accessToken": False})
+                
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket)
+    
+    
+    
 app.mount("/resolutions", StaticFiles(directory="uploads/resolutions"), name="pdfs")
 
 app.include_router(login.router)

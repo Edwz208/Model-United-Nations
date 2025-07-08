@@ -65,17 +65,18 @@ adminPaths = ["countries, resolutions, amendments, projection-dashboard"]
 async def getCountryNames():
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
-            await cursor.execute("""SELECT country from delegates""")
-            allCount = await cursor.fetchall()
-            return allCount
-        
-        
+            await cursor.execute("""SELECT array_agg(country) AS countries from delegates""")
+            allCount = await cursor.fetchone()
+            return allCount["countries"]
+             
+             
 async def getResolutions():
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
             await cursor.execute('''SELECT number, title, clauses, council_id, submitter, seconder, negator, url from resolutions''')
             allResolutions = await cursor.fetchall()
             return allResolutions
+        
         
 @router.get("/refresh")
 async def refresh_token(request: Request, pathName = str ):
@@ -87,9 +88,9 @@ async def refresh_token(request: Request, pathName = str ):
         payload = jwt.decode(token, REFRESH_KEY, algorithms=[ALGORITHM])
         payload["exp"] = datetime.now(timezone.utc) + timedelta(minutes=15)
         newAccess = jwt.encode(payload, SECRET_KEY, algorithm = ALGORITHM)
-        await task
-        await task1
-        return {"accessToken": newAccess, "role": payload["role"], "country": payload["country"], "countryNames": task1, "resolutions": task}
+        taskResult = await task
+        taskResult1 = await task1
+        return {"accessToken": newAccess, "role": payload["role"], "country": payload["country"], "countryNames": taskResult1, "resolutions": taskResult}
     else:
         raise HTTPException(status_code=401, detail="Missing access token")
     
