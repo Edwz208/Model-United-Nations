@@ -41,7 +41,7 @@ def generateJwt(data: dict, response: Response):
     expireR = datetime.now(timezone.utc) + timedelta(days=7)
     to_encodeR.update({"exp": expireR})
     refresh_jwt = jwt.encode(to_encodeR, REFRESH_KEY, algorithm=ALGORITHM)
-    response.set_cookie(key="refresh_token",value=f"Bearer {refresh_jwt}", httponly=True, secure=True, samesite="lax")
+    response.set_cookie(key="refresh_token",value=f"Bearer {refresh_jwt}", httponly=True, secure=False, samesite="lax", path="/")
     return encoded_jwt
 
 def get_current_user(token: str):
@@ -81,6 +81,7 @@ async def getResolutions():
 @router.get("/refresh")
 async def refresh_token(request: Request, pathName = str ):
     token = request.cookies.get("refresh_token")
+    print(f"Refresh token from cookies: {token}")
     if token:
         task = asyncio.create_task(getResolutions())
         task1 = asyncio.create_task(getCountryNames())
@@ -95,8 +96,5 @@ async def refresh_token(request: Request, pathName = str ):
         raise HTTPException(status_code=401, detail="Missing access token")
     
     # for sure need country names 
-@router.post("/logout")
-def logout(response: Response):
-    response.delete_cookie(key="refresh_token", httponly=True)
-    return {"message": "Logged out"}
+
         

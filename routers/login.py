@@ -31,3 +31,14 @@ async def login(user: User, response: Response):
             returned_info["role"] = [roleList[returned_info["role"]]]
             returned_info.update({"accessToken": generateJwt(returned_info, response)})
             return returned_info
+        
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=True,
+        secure=False,         
+        samesite="lax",     
+        path="/"   )       
+    print("cookie deleted")
+    return {"accessToken": ""}
