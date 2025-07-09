@@ -11,6 +11,7 @@ class Country(BaseModel):
     delegate3: Optional[str] = None
     delegate4: Optional[str] = None
     role: str = "member"
+    councils: str
     login: str
     
 class Resolution(BaseModel):
@@ -22,7 +23,6 @@ class Resolution(BaseModel):
     submitter: str
     seconder: str
     negator: str
-    
 
 class Exec(BaseModel):
     name: str
