@@ -25,7 +25,7 @@ def sanitizeKey(key):
 
 async def uniqueLogin():
     while True:
-        randomNum = await str(randrange(100000, 1000000))
+        randomNum = await hash(str(randrange(100000, 1000000)))
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute(
@@ -125,9 +125,10 @@ async def deleteCountry(country: str):
 async def oneCountry(country: Country):
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
-            await cursor.execute('''INSERT INTO delegates (country, delegate1, delegate2, delegate3, delegate4, role, login) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (country)
-                           DO UPDATE SET delegate1 = EXCLUDED.delegate1, delegate2 = EXCLUDED.delegate2, delegate3 = EXCLUDED.delegate3, delegate4 = EXCLUDED.delegate4, role = EXCLUDED.role, login = EXCLUDED.login RETURNING *;''',
-                           (country.assigned_country, country.delegate1,country.delegate2,country.delegate3,country.delegate4,country.role,country.login))
+            country.login = await hash(country.login)
+            await cursor.execute('''INSERT INTO delegates (country, delegate1, delegate2, delegate3, delegate4, role, councils, login) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (country)
+                           DO UPDATE SET delegate1 = EXCLUDED.delegate1, delegate2 = EXCLUDED.delegate2, delegate3 = EXCLUDED.delegate3, delegate4 = EXCLUDED.delegate4, role = EXCLUDED.role, councils = EXCLUDED.councils, login = EXCLUDED.login RETURNING *;''',
+                           (country.assigned_country, country.delegate1,country.delegate2,country.delegate3,country.delegate4,country.role,country.councils,country.login))
             return await cursor.fetchone()
 
 @router.post("/set-exec", status_code = status.HTTP_200_OK)
