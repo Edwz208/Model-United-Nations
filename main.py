@@ -4,19 +4,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv, find_dotenv
 from db import get_async_pool
 from contextlib import asynccontextmanager
-import asyncio
+import asyncio  
 import authentication
 from authentication import get_current_user
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 from fastapi.staticfiles import StaticFiles
-from typing import List, Annotated
+from typing import List
 import json
-from fastapi.security import OAuth2PasswordBearer
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-async_pool = get_async_pool()
 origins = [
     "http://localhost:8000",
     "http://localhost:5173",
@@ -26,13 +23,13 @@ async def check_async_connections():
     while True:
         await asyncio.sleep(600)
         print("check async connections health")
-        await async_pool.check()
+        await get_async_pool().check()
         
-@asynccontextmanager
+@asynccontextmanager # Async context manager allows for an async function to set up and remove resources upon startup and shutdown
 async def lifespan_handler(app: FastAPI):
     await get_async_pool().open()
-    task = asyncio.create_task(check_async_connections())
-    yield
+    task = asyncio.create_task(check_async_connections()) # background task that constantly occurs, at the same time as other event based tasks
+    yield # pause here until the app is shutting down
     task.cancel()
     await get_async_pool().close()
 

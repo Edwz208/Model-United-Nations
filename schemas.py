@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+
 class User(BaseModel):
     code: str
     country: str
@@ -11,7 +12,7 @@ class Country(BaseModel):
     delegate3: Optional[str] = None
     delegate4: Optional[str] = None
     role: str = "member"
-    councils: str
+    # councils: Optional[str] = None
     login: str
     
 class Resolution(BaseModel):

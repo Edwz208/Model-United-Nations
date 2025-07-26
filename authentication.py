@@ -4,16 +4,13 @@ import jwt
 from jwt.exceptions import InvalidTokenError
 import os
 from dotenv import load_dotenv
-from datetime import datetime, timedelta, timezone
-from typing import Annotated
 load_dotenv()
+from datetime import datetime, timedelta, timezone
 from fastapi import Depends, APIRouter, HTTPException, status, Response, Request
 from psycopg.rows import dict_row
 from db import get_async_pool
-
-
 pool = get_async_pool()
-
+router = APIRouter()
 roleList = {
   "member": 2007,
   "admin": 4015
@@ -41,7 +38,8 @@ def generateJwt(data: dict, response: Response):
     expireR = datetime.now(timezone.utc) + timedelta(days=7)
     to_encodeR.update({"exp": expireR})
     refresh_jwt = jwt.encode(to_encodeR, REFRESH_KEY, algorithm=ALGORITHM)
-    response.set_cookie(key="refresh_token",value=f"Bearer {refresh_jwt}", httponly=True, secure=False, samesite="lax", path="/")
+    response.set_cookie(key="refresh_token",value=f"Bearer {refresh_jwt}", httponly=True, secure=False, samesite="lax", path="/refresh")
+    # set secure once not in dev 
     return encoded_jwt
 
 def get_current_user(token: str):
@@ -59,8 +57,6 @@ def get_current_user(token: str):
     except InvalidTokenError: 
         raise credentials_exception
     
-router = APIRouter()
-adminPaths = ["countries, resolutions, amendments, projection-dashboard"]
 
 async def getCountryNames():
     async with pool.connection() as conn:
@@ -79,7 +75,7 @@ async def getResolutions():
         
         
 @router.get("/refresh")
-async def refresh_token(request: Request, pathName = str ):
+async def refresh_token(request: Request):
     token = request.cookies.get("refresh_token")
     print(f"Refresh token from cookies: {token}")
     if token:

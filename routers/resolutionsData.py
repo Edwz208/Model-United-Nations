@@ -43,7 +43,7 @@ async def uploading_resolution(
     try:
         resolutionData = Resolution(council=council,title = title, clauses=clauses, status="pending", submitter = submitter, seconder=seconder, negator=negator, number=number)
     except ValidationError as e:
-        raise HTTPException(status_code=422, detail=e.errors())
+        raise HTTPException(status_code=422, detail=e)
     
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:

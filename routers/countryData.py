@@ -25,7 +25,7 @@ def sanitizeKey(key):
 
 async def uniqueLogin():
     while True:
-        randomNum = await str(randrange(100000, 1000000))
+        randomNum = str(randrange(100000, 1000000))
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute(
