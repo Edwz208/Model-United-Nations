@@ -22,15 +22,15 @@ async def login(user: User, response: Response):
                 (user.country,),
             )
             returned_info = await cursor.fetchone()
-            role = returned_info["role"]
-            returned_info["role"] = [role]
-            id = returned_info["id"]
+
             if not returned_info or (not user.code==returned_info["login"]):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Invalid credes",
                 )# removed hash check for now
-            
+            role = returned_info["role"]
+            returned_info["role"] = [role]
+            id = returned_info["id"]
             recentAmendments = asyncio.create_task(getRecentAmendments()) 
             del returned_info["login"]
             returned_info.update({"accessToken": generateJwt(returned_info, SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES)})
