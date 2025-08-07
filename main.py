@@ -1,5 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
-from routers import countryData, login, resolutionsData
+from routers import countryData, login, resolutionsData, amendmentsData
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv, find_dotenv
 from db import get_async_pool
@@ -28,6 +28,7 @@ async def check_async_connections():
 @asynccontextmanager # Async context manager allows for an async function to set up and remove resources upon startup and shutdown
 async def lifespan_handler(app: FastAPI):
     await get_async_pool().open()
+    
     task = asyncio.create_task(check_async_connections()) # background task that constantly occurs, at the same time as other event based tasks
     yield # pause here until the app is shutting down
     task.cancel()
@@ -88,9 +89,9 @@ async def websocket_endpoint(websocket: WebSocket):
     
     
     
-app.mount("/resolutions", StaticFiles(directory="uploads/resolutions"), name="pdfs")
+app.mount("/resolutions-pdfs", StaticFiles(directory="uploads/resolutions"), name="pdfs") # served from localhost80000 because server
 
 app.include_router(login.router)
 app.include_router(countryData.router)
-app.include_router(authentication.router)
 app.include_router(resolutionsData.router)
+app.include_router(amendmentsData.router)
