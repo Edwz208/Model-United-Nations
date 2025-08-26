@@ -5,7 +5,6 @@ from dotenv import load_dotenv, find_dotenv
 from db import get_async_pool
 from contextlib import asynccontextmanager
 import asyncio  
-import authentication
 from authentication import get_current_user
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)

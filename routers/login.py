@@ -5,7 +5,6 @@ from db import get_async_pool
 from psycopg.rows import dict_row
 import asyncio
 router = APIRouter()
-from .countryData import personalProfile, specificProfile
 from .amendmentsData import getOwnAmendments, getRecentAmendments
 
 pool = get_async_pool()
@@ -29,24 +28,20 @@ async def login(user: User, response: Response):
                     detail="Invalid credes",
                 )# removed hash check for now
             role = returned_info["role"]
-            returned_info["role"] = [role]
+            print(role)
+            returned_info["roles"] = [role]
+            
             id = returned_info["id"]
             recentAmendments = asyncio.create_task(getRecentAmendments()) 
+            del returned_info["role"]
             del returned_info["login"]
             returned_info.update({"accessToken": generateJwt(returned_info, SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES)})
             response.set_cookie(key="refresh_token",value=f"Bearer {generateJwt(returned_info, REFRESH_KEY, REFRESH_TOKEN_EXPIRE_MINUTES)}", httponly=True, secure=False, samesite="lax", path="/refresh")
-            if roleList.get("member") in returned_info["role"]:
-                personalDetails = asyncio.create_task(personalProfile(id))
+            if roleList.get("member") in returned_info["roles"]:
                 ownAmendments = asyncio.create_task(getOwnAmendments(id))
-
-                print(personalDetails)
-                returned_info["personalDetails"] = await personalDetails
                 returned_info["ownAmendments"] = await ownAmendments
                 returned_info["recentAmendments"] = await recentAmendments
-            elif role == roleList.get("admin"):
-                personalDetails = await specificProfile(id)
-                await recentAmendments
-                returned_info["personalDetails"] = await personalDetails
+            elif roleList.get("admin") in returned_info['roles']:
                 returned_info["recentAmendments"] = await recentAmendments
             print(returned_info)
             return returned_info # set secure cookie once not in dev
@@ -70,19 +65,20 @@ async def refresh_token(request: Request):
     token = request.cookies.get("refresh_token")
     print(f"Refresh token from cookies: {token}")
     token = token.replace("Bearer ", "")
+    print(token)
     payload = await decode(token, REFRESH_KEY)
+    print(payload)
     if token:
         recentAmendments = asyncio.create_task(getRecentAmendments()) # wraps a async coroutine object into a task
         # create task is used so that getResolutions() is run right here in the background and we await retrieve the result later
         # this allows for the rest of the function to run while the task is being executed
-        newAccess = generateJwt(payload, REFRESH_KEY, REFRESH_TOKEN_EXPIRE_MINUTES)
-        if payload.get("role") == roleList.get("member"):
-            personalDetails = asyncio.create_task(personalProfile(payload["id"]))
+        newAccess = generateJwt(payload, SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES)
+        print(payload.get("roles"))
+        if roleList.get("member") in payload.get("roles"):
             ownAmendments = asyncio.create_task(getOwnAmendments(payload["id"]))
-            return {"accessToken": newAccess, "role": payload["role"], "country": payload["country"], "id": payload["id"], "personalDetails": await personalDetails, "ownAmendments": await ownAmendments, "recentAmendments": await recentAmendments}
-        elif payload.get("role") == roleList.get("admin"):
-            personalDetails = await specificProfile(payload["id"])
-        return {"accessToken": newAccess, "role": payload["role"], "country": payload["country"], "personalDetails": personalDetails, "recentAmendments": await recentAmendments}
+            return {"accessToken": newAccess, "roles": payload["roles"], "country": payload["country"], "id": payload["id"],"ownAmendments": await ownAmendments, "recentAmendments": await recentAmendments}
+        elif roleList.get("admin") in payload.get("roles"):
+            return {"accessToken": newAccess, "roles": payload["roles"], "country": payload["country"], "recentAmendments": await recentAmendments}
     else:
         raise HTTPException(status_code=401, detail="Missing refresh token")
 

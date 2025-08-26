@@ -34,18 +34,18 @@ class Resolution(BaseModel):
     council: int
     status: str
     clauses: int
-    submitter: str
-    seconder: str
-    negator: str
+    submitter: int
+    seconder: int
+    negator: int
 
 class ResolutionPatch(BaseModel):
     title: Optional[str] = None
     council: Optional[int] = None 
     status: Optional[str] = None
     clauses: Optional[int] = None
-    submitter: Optional[str] = None
-    seconder: Optional[str] = None
-    negator: Optional[str] = None
+    submitter: Optional[int] = None
+    seconder: Optional[int] = None
+    negator: Optional[int] = None
     url: Optional[str] = None
 
 class Amendment(BaseModel):
@@ -53,7 +53,7 @@ class Amendment(BaseModel):
     resolution_id: int
     status: Optional[str] = 'pending review'
     clause: int
-    submitter: List[str] 
+    submitter: List[int] 
     content: str
 
 class AmendmentPatch(BaseModel):
@@ -61,7 +61,7 @@ class AmendmentPatch(BaseModel):
     resolution_id: Optional[int] = None
     status: Optional[str] = 'pending review'
     clause: Optional[int] = None
-    submitter: Optional[List[str]] = None
+    submitter: Optional[List[int]] = None
     content: Optional[str] = None
 
 class Exec(BaseModel):

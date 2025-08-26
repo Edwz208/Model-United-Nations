@@ -23,7 +23,7 @@ def sanitizeKey(key):
 async def getCountriesGeneral():
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
-            await cursor.execute("""SELECT country, amendments_submitted, speaker_points from delegates WHERE role = %s""", (str(roleList.get("member")),))
+            await cursor.execute("""SELECT country, amendments_submitted, speaker_points, id from delegates WHERE role = %s ORDER BY country ASC""", (str(roleList.get("member")),))
             allCount = await cursor.fetchall()
             return allCount  
         
@@ -127,6 +127,7 @@ async def updateOneCountry(country: CountryPatch):
     #if payload.get("role") == roleList.get("admin") or payload.get("id") == country.id:
     if True:
         country = country.model_dump(exclude_unset=True)
+        print("hi")
         if country.get("id") is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
