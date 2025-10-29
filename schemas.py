@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
+from fastapi import UploadFile
 
 class User(BaseModel):
     code: str
@@ -11,11 +12,10 @@ class Country(BaseModel):
     delegate2: Optional[str] = None
     delegate3: Optional[str] = None
     delegate4: Optional[str] = None
-    role: str = "member"
+    role: str = 'member'
     amendments_submitted: Optional[int] = 0
     speaker_points: Optional[int] = 0
     login: str
-    id: int
 
 class CountryPatch(BaseModel):
     assigned_country: Optional[str] = None
@@ -23,16 +23,14 @@ class CountryPatch(BaseModel):
     delegate2: Optional[str] = None
     delegate3: Optional[str] = None
     delegate4: Optional[str] = None
-    role: Optional[str] = "member"
+    role: Optional[str] = 'member'
     amendments_submitted: Optional[int] = 0
     speaker_points: Optional[int] = 0
     login: Optional[str] = None
-    id: int
     
 class Resolution(BaseModel):
     title: str
-    council: int
-    status: str
+    council_id: str
     clauses: int
     submitter: int
     seconder: int
@@ -40,7 +38,7 @@ class Resolution(BaseModel):
 
 class ResolutionPatch(BaseModel):
     title: Optional[str] = None
-    council: Optional[int] = None 
+    council_id: Optional[str] = None 
     status: Optional[str] = None
     clauses: Optional[int] = None
     submitter: Optional[int] = None
@@ -53,7 +51,7 @@ class Amendment(BaseModel):
     resolution_id: int
     status: Optional[str] = 'pending review'
     clause: int
-    submitter: List[int] 
+    submitter: list[int] 
     content: str
 
 class AmendmentPatch(BaseModel):
@@ -61,7 +59,7 @@ class AmendmentPatch(BaseModel):
     resolution_id: Optional[int] = None
     status: Optional[str] = 'pending review'
     clause: Optional[int] = None
-    submitter: Optional[List[int]] = None
+    submitter: Optional[list[int]] = None
     content: Optional[str] = None
 
 class Exec(BaseModel):
