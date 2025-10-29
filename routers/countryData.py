@@ -7,7 +7,7 @@ from schemas import Country, CountryPatch, Exec, ExecPatch
 from random import randrange
 from db import get_async_pool
 from psycopg.rows import dict_row
-from authentication import hash, get_current_user, roleList, verify
+from authentication import get_current_user
 from typing import Annotated
 from fastapi.security import OAuth2PasswordBearer
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -17,34 +17,31 @@ pool = get_async_pool()
 router = APIRouter()
 
 
-def sanitizeKey(key):
+def sanitizeKey(key: str) -> str:
     return key.strip().lower().replace("#", "").replace(" ", "_")
 
-async def getCountriesGeneral():
+async def getCountriesGeneral() -> dict:
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
-            await cursor.execute("""SELECT country, amendments_submitted, speaker_points, id from delegates WHERE role = %s ORDER BY country ASC""", (str(roleList.get("member")),))
+            await cursor.execute("""SELECT country, amendments_submitted, speaker_points, id from delegates WHERE roles = %s ORDER BY country ASC""", ('member',))
             allCount = await cursor.fetchall()
             return allCount  
         
-async def personalProfile(country: int):
+async def personalProfile(id: int) -> dict:
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
-            await cursor.execute("""SELECT country, delegate1, delegate2, delegate3, delegate4, login, amendments_submitted, speaker_points from delegates WHERE id = %s""", (country,))
+            await cursor.execute("""SELECT country, delegate1, delegate2, delegate3, delegate4, login, amendments_submitted, speaker_points from delegates WHERE id = %s""", (id,))
             personalCountry= await cursor.fetchone()
             return personalCountry
 
-async def specificProfile(country: int):
+async def specificProfile(id: int) -> dict:
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
-            if (country!="admin"):
-                await cursor.execute("""SELECT country, delegate1, delegate2, delegate3, delegate4, amendments_submitted, speaker_points from delegates WHERE id = %s""", (country,))
-                specificCountry= await cursor.fetchone()
-                return specificCountry
-            else:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Country not found")
+            await cursor.execute("""SELECT country, delegate1, delegate2, delegate3, delegate4, amendments_submitted, speaker_points from delegates WHERE id = %s""", (id,))
+            specificCountry= await cursor.fetchone()
+            return specificCountry
         
-async def uniqueLogin():
+async def uniqueLogin() -> int:
     while True:
         randomNum = str(randrange(100000, 1000000)) #unhashed for now
         async with pool.connection() as conn:
@@ -56,27 +53,14 @@ async def uniqueLogin():
                 unique = await cursor.fetchone()
                 if unique:
                     return randomNum
-                
-async def uniqueCountryID():
-    while True:
-        randomNum = str(randrange(100000, 1000000)) #unhashed for now
-        async with pool.connection() as conn:
-            async with conn.cursor(row_factory=dict_row) as cursor:
-                await cursor.execute(
-                    """SELECT exists (SELECT 1 FROM delegates WHERE id = %s LIMIT 1);""",
-                    (randomNum,),
-                )
-                unique = await cursor.fetchone()
-                if unique:
-                    return randomNum
+        
 
 # Add countries
 @router.get("/sheet-export",status_code = status.HTTP_200_OK)
-# async def sheetExport(token: Annotated[str, Depends(oauth2_scheme)]):
-async def sheetExport():
-    if True:
-    # payload = get_current_user(token)
-    # if payload.get("role") == roleList.get("admin"):
+async def sheetExport(token: Annotated[str, Depends(oauth2_scheme)]):
+    print(token)
+    payload = get_current_user(token)
+    if 'admin' == payload.get("role"):
         url = os.getenv("SPREADSHEET")
         response = requests.get(url)
         csvString = response.text
@@ -86,12 +70,11 @@ async def sheetExport():
         sanitizedKeys = [sanitizeKey(name) for name in rawKeys]
         reader = csv.DictReader(f, fieldnames=sanitizedKeys)
         data = list(reader)
-        print(data)
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 for row in data:
                     del row["school"]
-                    row["role"] = "member"
+                    row["role"] = 'member'
                     await cursor.execute(
                         """INSERT INTO delegates (country, delegate1, delegate2, delegate3, delegate4, login, role) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (country) DO UPDATE
                         SET delegate1 = EXCLUDED.delegate1,
@@ -108,7 +91,7 @@ async def sheetExport():
                             row["delegate_3"],
                             row["delegate_4"],
                             await uniqueLogin(),
-                            roleList.get("member"),
+                            row["role"],
                         ),
                     )
             return data
@@ -120,20 +103,11 @@ async def sheetExport():
 
 # update single country
 @router.patch('/update-single-country',status_code = status.HTTP_200_OK)
-# async def updateOneCountry(country: Country, token: Annotated[str, Depends(oauth2_scheme)]):
-async def updateOneCountry(country: CountryPatch):
-    #payload = get_current_user(token)
-    
-    #if payload.get("role") == roleList.get("admin") or payload.get("id") == country.id:
-    if True:
-        country = country.model_dump(exclude_unset=True)
-        print("hi")
-        if country.get("id") is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Country name is required"
-            )
-        else: 
+async def updateOneCountry(country: CountryPatch, token: Annotated[str, Depends(oauth2_scheme)]):
+    payload = get_current_user(token)
+    if 'admin' == payload.get("role") or payload.get("id") == country.id:
+        if country.get("role") != 'admin':
+            country = country.model_dump(exclude_unset=True)
             async with pool.connection() as conn:
                 async with conn.cursor(row_factory=dict_row) as cursor:
                     query = """
@@ -157,7 +131,7 @@ async def updateOneCountry(country: CountryPatch):
                         country.get("delegate2"),
                         country.get("delegate3"),
                         country.get("delegate4"),
-                        roleList.get(country.get("role")),
+                        country.get("role"),
                         country.get("login"),
                         country.get("amendments_submitted"),
                         country.get("speaker_points"),
@@ -166,7 +140,7 @@ async def updateOneCountry(country: CountryPatch):
                     await cursor.execute(query, params)
                     result = await cursor.fetchone()
                     print(result)
-            return result
+        return result
     else: 
         raise HTTPException(
             status_code = status.HTTP_401_UNAUTHORIZED,
@@ -175,17 +149,14 @@ async def updateOneCountry(country: CountryPatch):
 
 # add single country
 @router.post('/add-single-country',status_code = status.HTTP_200_OK)
-# async def addOneCountry(country: Country, token: Annotated[str, Depends(oauth2_scheme)]):
-async def addOneCountry(country: Country):
-    #payload = get_current_user(token)
-    #if payload.get("role") == roleList.get("admin"):
-    if True:
+async def addOneCountry(country: Country, token: Annotated[str, Depends(oauth2_scheme)]):
+    payload = get_current_user(token)
+    if 'admin' == payload.get("role"):
         try: 
             async with pool.connection() as conn:
                 async with conn.cursor(row_factory=dict_row) as cursor:
-                    # country.login = await hash(country.login) gone for now
                     await cursor.execute('''INSERT INTO delegates (country, delegate1, delegate2, delegate3, delegate4, role, login, amendments_submitted, speaker_points) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *;''',
-                                (country.assigned_country, country.delegate1,country.delegate2,country.delegate3,country.delegate4,roleList.get(country.role),country.login, country.amendments_submitted, country.speaker_points))
+                                (country.assigned_country, country.delegate1,country.delegate2,country.delegate3,country.delegate4,country.role,country.login, country.amendments_submitted, country.speaker_points))
                     result = await cursor.fetchone() # removed the on conflict update instead itll throw uniqueviolation
             print(result)
             return result
@@ -202,11 +173,9 @@ async def addOneCountry(country: Country):
         
 
 @router.get("/get-countries", status_code = status.HTTP_200_OK)
-# async def getAllCountries(token: Annotated[str, Depends(oauth2_scheme)]):
-async def getAllCountries():
-    #payload = get_current_user(token)
-    #if payload.get("role") == roleList.get("admin") or payload.get("role") == roleList.get("member"):
-    if True:
+async def getAllCountries(token: Annotated[str, Depends(oauth2_scheme)]):
+    payload = get_current_user(token)
+    if 'admin' == payload.get("role") or 'member' == payload.get("role"):
         allCount = await getCountriesGeneral()
         print(allCount)
         return allCount
@@ -217,21 +186,18 @@ async def getAllCountries():
         )  
 
 
-@router.get("/select-country/{country}",status_code = status.HTTP_200_OK)
-# async def selectCountry(country: str, token: Annotated[str, Depends(oauth2_scheme)]):
-async def selectCountry(country: int):
-    #payload = get_current_user(token)
-    #if payload.get("role") == roleList.get("admin") or payload.get("role") == roleList.get("member"):
-    if True:
-        # if country == payload.get("id"):
-        if True:
-            result = await personalProfile(country)
+@router.get("/select-country/{id}",status_code = status.HTTP_200_OK)
+async def selectCountry(country: str, token: Annotated[str, Depends(oauth2_scheme)]):
+    payload = get_current_user(token)
+    if 'admin' == payload.get("role") or 'member' == payload.get("role"):
+        if id == payload.get("id") or 'admin' == payload.get("role"):
+            result = await personalProfile(id)
         else:
-            result = await specificProfile(country)
+            result = await specificProfile(id)
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Country with name {country} was not found",
+                detail=f"Country with id {id} was not found",
             )
         return result
     else: 
@@ -241,11 +207,9 @@ async def selectCountry(country: int):
         )  
 
 @router.post("/set-exec", status_code = status.HTTP_200_OK)
-async def setExec(person: Exec):
-# async def setExec(person: Exec, token: Annotated[str, Depends(oauth2_scheme)]):
-    #payload = get_current_user(token)
-    #if payload.get("role") == roleList.get("admin"):
-    if True:
+async def setExec(person: Exec, token: Annotated[str, Depends(oauth2_scheme)]):
+    payload = get_current_user(token)
+    if 'admin' == payload.get("role"):
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute('''INSERT INTO secretariat (name, position) VALUES (%s,%s) ON CONFLICT (name)
@@ -267,11 +231,9 @@ async def getAllExecs():
             return allCount
         
 @router.delete('/delete-secretariat/{id}', status_code = status.HTTP_200_OK)
-# async def setExec(name: str, token: Annotated[str, Depends(oauth2_scheme)]):
-async def deleteExec(id: int):
-    #payload = get_current_user(token)
-    #if payload.get("role") == roleList.get("admin"):
-    if True:
+async def setExec(id: str, token: Annotated[str, Depends(oauth2_scheme)]):
+    payload = get_current_user(token)
+    if 'admin' == payload.get("role"):
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute('''delete from secretariat where id = %s returning *''', (id,))
@@ -289,11 +251,9 @@ async def deleteExec(id: int):
         )
     
 @router.patch('/update-secretariat', status_code = status.HTTP_200_OK)
-# async def updateExec(exec: ExecPatch, token: Annotated[str, Depends(oauth2_scheme)]):
-async def updateExec(exec: ExecPatch):
-    #payload = get_current_user(token)
-    #if payload.get("role") == roleList.get("admin"):
-    if True:
+async def updateExec(exec: ExecPatch, token: Annotated[str, Depends(oauth2_scheme)]):
+    payload = get_current_user(token)
+    if 'admin' == payload.get("role"):
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute('''UPDATE secretariat SET 
@@ -315,16 +275,14 @@ async def updateExec(exec: ExecPatch):
 
         
 # delete
-@router.delete("/select-country/{country}", status_code = status.HTTP_200_OK)
-async def deleteCountry(country: int):
-# async def deleteCountry(country: str, token: Annotated[str, Depends(oauth2_scheme)]):
-    #payload = get_current_user(token)
-    #if payload.get("role") == roleList.get("admin"):
-    if True:
+@router.delete("/select-country/{id}", status_code = status.HTTP_200_OK)
+async def deleteCountry(id: str, token: Annotated[str, Depends(oauth2_scheme)]):
+    payload = get_current_user(token)
+    if 'admin' == payload.get("role"):
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute(
-                    """DELETE FROM delegates WHERE id = %s RETURNING *""", (country,)
+                    """DELETE FROM delegates WHERE id = %s AND role != 'admin' RETURNING *""", (id,)
                 )
                 result = await cursor.fetchone()
                 if not result:
@@ -332,11 +290,9 @@ async def deleteCountry(country: int):
                         status_code=status.HTTP_404_NOT_FOUND,
                         detail=f"Country not found",
                     )
-                return {"message": f"{country} deleted"}
+                return {"message": f"{result["country"]} deleted"}
     else: 
         raise HTTPException(
             status_code = status.HTTP_401_UNAUTHORIZED,
             detail="Unauthorized page"
         )
-        
-# need to make so that admin country is untouchable
