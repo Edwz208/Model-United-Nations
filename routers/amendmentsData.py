@@ -10,14 +10,14 @@ from authentication import get_current_user, roleList
 pool = get_async_pool()
 router = APIRouter()
 
-async def getOwnAmendments(country: int):
+async def getOwnAmendments(id: int) -> dict:
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
-            await cursor.execute("""WITH country_name as (SELECT country from delegates WHERE id=%s) SELECT content,clause,resolution_id,submitter,status,resolution_title, modified_at from amendments WHERE (SELECT country from country_name) = ANY(submitter)""", (country,))
+            await cursor.execute("""SELECT content,clause,resolution_id,submitter,status,resolution_title, modified_at from amendments WHERE (%s) = ANY(submitter)""", (id,))
             ownAmendments = await cursor.fetchall()
             return ownAmendments
         
-async def getRecentAmendments():
+async def getRecentAmendments() -> dict:
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cursor:
             await cursor.execute("""SELECT content, clause, resolution_id, submitter, status, resolution_title, modified_at from amendments ORDER BY modified_at DESC LIMIT 3""")
@@ -28,7 +28,7 @@ async def getRecentAmendments():
 # async def specificCountryAmendment(token: Annotated[str, Depends(oauth2_scheme)], country: str):
 async def specificCountryAmendment(country: int):
     # payload = get_current_user(token)
-    # if payload.get("role") == roleList.get("admin") or payload.get("role") == roleList.get("member"):
+    # if roleList.get("admin") in payload.get("roles") roleList.get("member")in payload.get("roles"):
     if True:
         amendments = await getOwnAmendments(country)
         return amendments
@@ -39,7 +39,7 @@ async def specificCountryAmendment(country: int):
 # async def allAmendments(token: Annotated[str, Depends(oauth2_scheme)]):
 async def allAmendments():
     # payload = get_current_user(token)
-    # if payload.get("role") == roleList.get("admin") or payload.get("role") == roleList.get("member"):
+    # if roleList.get("admin") in payload.get("roles") roleList.get("member")in payload.get("roles"):
     if True:
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
@@ -57,7 +57,7 @@ async def allAmendments():
 async def uploading_amendment(amendment: Amendment):
     print("hi")
     # payload = get_current_user(token)
-    # if payload.get("role") == roleList.get("admin") or payload.get("role") == roleList.get("member"):
+    # if roleList.get("admin") in payload.get("roles") roleList.get("member")in payload.get("roles"):
     print(amendment.resolution_title)
     if True:
         try: 
@@ -81,7 +81,7 @@ async def uploading_amendment(amendment: Amendment):
 async def updateAmendment(token: Annotated[str, Depends(oauth2_scheme)], number: int, amendment: AmendmentPatch):
 # async def updateAmendment(number: int, amendment: AmendmentPatch):
     payload = get_current_user(token)
-    if payload.get("role") == roleList.get("member"):
+    if payload.get("role") == roleList.get("member"): # need to check if its the same country
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute('''WITH country_name as (SELECT country from delegates WHERE id=%s) UPDATE amendments SET 
