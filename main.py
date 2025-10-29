@@ -1,24 +1,26 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from routers import countryData, login, resolutionsData, amendmentsData
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
 from dotenv import load_dotenv, find_dotenv
+
 from db import get_async_pool
 from contextlib import asynccontextmanager
 import asyncio  
 from authentication import get_current_user
-dotenv_path = find_dotenv()
-load_dotenv(dotenv_path)
-from fastapi.staticfiles import StaticFiles
-from typing import List
+
 import json
 
+dotenv_path = find_dotenv()
+load_dotenv(dotenv_path)
 
 origins = [
     "http://localhost:8000",
     "http://localhost:5173",
 ]   
 
-async def check_async_connections():
+async def check_async_connections() -> None:
     while True:
         await asyncio.sleep(600)
         print("check async connections health")
@@ -34,19 +36,26 @@ async def lifespan_handler(app: FastAPI):
     await get_async_pool().close()
 
 app = FastAPI(lifespan=lifespan_handler)
-    
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
-)
+    allow_credentials=True, # allows for cookiese
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Authorization"],
+) 
+    
+app.mount("/resolutions-pdfs", StaticFiles(directory="uploads/resolutions"), name="pdfs") # served from localhost80000 because server
+
+app.include_router(login.router) # APIRouter() is used to separate the routes into multiple files
+app.include_router(countryData.router)
+app.include_router(resolutionsData.router)
+app.include_router(amendmentsData.router)
 
 
 class ConnectionManager:
     def __init__(self) -> None:
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
@@ -78,19 +87,10 @@ async def websocket_endpoint(websocket: WebSocket):
             token = data.get("accessToken")
             payload = get_current_user(token)
             if payload.get("role") == 4015:
-                message = {"message": data}
-                manager.broadcast(json.dumps(message))
+                message = {"message": data} 
+                await manager.broadcast(json.dumps(message))
             else:
                 manager.send_personal_message({"accessToken": False})
                 
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
-    
-    
-    
-app.mount("/resolutions-pdfs", StaticFiles(directory="uploads/resolutions"), name="pdfs") # served from localhost80000 because server
-
-app.include_router(login.router)
-app.include_router(countryData.router)
-app.include_router(resolutionsData.router)
-app.include_router(amendmentsData.router)
