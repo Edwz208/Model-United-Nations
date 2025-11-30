@@ -3,8 +3,7 @@ from functools import lru_cache
 from psycopg_pool import AsyncConnectionPool # Creates a pool of connections that can work asynchronously
 from dotenv import load_dotenv
 load_dotenv() # must keep
-conninfo = f"host='localhost' dbname='mmun' user='postgres' password={os.getenv('DB_PASSWORD')}"
-
+conninfo = os.getenv("DATABASE_URL")
 @lru_cache() # decorator that all function calls with the same arguments use the same instance of the object, thus using the same pool and connections
 def get_async_pool() -> AsyncConnectionPool:
     return AsyncConnectionPool(conninfo=conninfo,

@@ -11,10 +11,9 @@ import asyncio
 from authentication import get_current_user
 
 import json
-
+import os
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
-
 origins = [
     "http://localhost:8000",
     "http://localhost:5173",
@@ -84,13 +83,13 @@ async def websocket_endpoint(websocket: WebSocket):
     try: 
         while True:
             data = await websocket.receive_text()
-            token = data.get("accessToken")
+            token = json.loads(data).get("accessToken")
             payload = get_current_user(token)
-            if payload.get("role") == 4015:
+            if payload.get("role") == 'member':
                 message = {"message": data} 
                 await manager.broadcast(json.dumps(message))
             else:
-                manager.send_personal_message({"accessToken": False})
+                await manager.send_personal_message(json.dumps({"accessToken": False}), websocket)
                 
     except WebSocketDisconnect:
         await manager.disconnect(websocket)

@@ -290,7 +290,7 @@ async def deleteCountry(id: str, token: Annotated[str, Depends(oauth2_scheme)]):
                         status_code=status.HTTP_404_NOT_FOUND,
                         detail=f"Country not found",
                     )
-                return {"message": f"{result["country"]} deleted"}
+                return {"message": f"{result['country']} deleted"}
     else: 
         raise HTTPException(
             status_code = status.HTTP_401_UNAUTHORIZED,

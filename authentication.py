@@ -6,11 +6,6 @@ import os
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 
-roleList = {
-  "member": "2007",
-  "admin": "4015"
-}
-
 SECRET_KEY = os.getenv("SECRET_KEY")
 REFRESH_KEY = os.getenv("REFRESH_KEY")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

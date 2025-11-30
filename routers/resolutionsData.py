@@ -94,10 +94,10 @@ async def uploading_resolution(
                     await cursor.execute('''UPDATE councils SET resolution_count = resolution_count + 1 WHERE id = %s RETURNING *''', (council_id,))
                     number = await cursor.fetchone()
                     if len(number.get('resolution_count')) == 1:
-                        number['resolution_count'] = f'0{number.get('resolution_count')}'
+                        number['resolution_count'] = f"0{number.get('resolution_count')}"
                     if len(council_id) == 1:
                         council_id_as_string = f'0{council_id}'
-                    resolution_id = f'{council_id_as_string}{number.get('resolution_count')}'
+                    resolution_id = f"{council_id_as_string}{number.get('resolution_count')}"
                     print("resolution_id",resolution_id)
                     await cursor.execute('''INSERT INTO resolutions (council_id, title, url, number, clauses, submitter, seconder, negator) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) returning *''', 
                                 (council_id,title,url,int(resolution_id),clauses,submitter,seconder,negator))

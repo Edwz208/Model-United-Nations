@@ -6,7 +6,7 @@ from psycopg.errors import ForeignKeyViolation
 from typing import Annotated
 from fastapi.security import OAuth2PasswordBearer
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-from authentication import get_current_user, roleList
+from authentication import get_current_user
 pool = get_async_pool()
 router = APIRouter()
 
@@ -81,7 +81,7 @@ async def uploading_amendment(amendment: Amendment):
 async def updateAmendment(token: Annotated[str, Depends(oauth2_scheme)], number: int, amendment: AmendmentPatch):
 # async def updateAmendment(number: int, amendment: AmendmentPatch):
     payload = get_current_user(token)
-    if payload.get("role") == roleList.get("member"): # need to check if its the same country
+    if payload.get("role") == 'member': # need to check if its the same country
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute('''WITH country_name as (SELECT country from delegates WHERE id=%s) UPDATE amendments SET 
@@ -115,12 +115,12 @@ async def updateAmendment(token: Annotated[str, Depends(oauth2_scheme)], number:
 async def deleteAmendment(token: Annotated[str, Depends(oauth2_scheme)], number: int):
 # async def deleteAmendment(number: int):
     payload = get_current_user(token)
-    if payload.get("role") == roleList.get("member"):
+    if payload.get("role") == 'member':
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute('''WITH country_name as (SELECT country from delegates WHERE id=%s), deleteAmend as (DELETE from amendments WHERE amendment_id=%s and (select country from country_name) =ANY(submitter) RETURNING * ), updateResolution as (UPDATE resolutions SET amendment_count = amendment_count -1 WHERE number = (select resolution_id from deleteAmend)) select * from deleteAmend''', (payload.get("id"),number,))
                 result = await cursor.fetchone()
-    elif payload.get("role") == roleList.get("admin"):
+    elif payload.get("role") == 'admin':
         async with pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cursor:
                 await cursor.execute('''WITH deleteAmend as (DELETE from amendments WHERE amendment_id=%s RETURNING *), updateResolutions as (UPDATE resolutions SET amendment_count = amendment_count -1 WHERE number = (select resolution_id from deleteAmend)) select * from deleteAmend''', (number,))

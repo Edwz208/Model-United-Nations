@@ -1,12 +1,11 @@
 from pydantic import BaseModel
 from typing import Optional
-from fastapi import UploadFile
 
 class User(BaseModel):
     code: str
     country: str
     
-class Country(BaseModel):
+class Country(BaseModel): #country creation
     assigned_country: str
     delegate1: str
     delegate2: Optional[str] = None
@@ -22,10 +21,9 @@ class CountryPatch(BaseModel):
     delegate1: Optional[str] = None
     delegate2: Optional[str] = None
     delegate3: Optional[str] = None
-    delegate4: Optional[str] = None
-    role: Optional[str] = 'member'
-    amendments_submitted: Optional[int] = 0
-    speaker_points: Optional[int] = 0
+    delegate4: Optional[str] = None # no role here
+    amendments_submitted: Optional[int] = None
+    speaker_points: Optional[int] = None # is this allowed?
     login: Optional[str] = None
     
 class Resolution(BaseModel):
@@ -57,7 +55,7 @@ class Amendment(BaseModel):
 class AmendmentPatch(BaseModel):
     resolution_title: Optional[str] = None
     resolution_id: Optional[int] = None
-    status: Optional[str] = 'pending review'
+    status: Optional[str] = None
     clause: Optional[int] = None
     submitter: Optional[list[int]] = None
     content: Optional[str] = None
