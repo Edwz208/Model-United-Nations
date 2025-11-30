@@ -1,3 +1,3 @@
 Backend for MMUN 
 Run with uvicorn
-Edwin and Nathan
+Edwin and Nathan Larry P
