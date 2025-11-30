@@ -2,9 +2,9 @@ name: Backend CI/CD
 
 on:
   push:
-    branches: [ restored_commits ]
+    branches: [ restored_backend ]
   pull_request:
-    branches: [ restored_commits ]
+    branches: [ restored_backend ]
 
 jobs:
   build-and-push:
