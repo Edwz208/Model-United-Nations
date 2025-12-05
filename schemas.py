@@ -15,6 +15,7 @@ class Country(BaseModel):
     amendments_submitted: Optional[conint(ge=0)] = 0
     speaker_points: Optional[conint(ge=0)] = 0
     login: constr(min_length=2)
+    councils: list[int] 
 
 class CountryPatch(BaseModel):
     assigned_country: Optional[str] = None
