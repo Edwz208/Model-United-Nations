@@ -1,20 +1,20 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, conint, constr
 from typing import Optional
 
 class User(BaseModel):
-    code: str
-    country: str
+    code: constr(min_length=2)
+    country: constr(min_length=2)
     
-class Country(BaseModel): #country creation
+class Country(BaseModel):
     assigned_country: str
     delegate1: str
     delegate2: Optional[str] = None
     delegate3: Optional[str] = None
     delegate4: Optional[str] = None
-    role: str = 'member'
-    amendments_submitted: Optional[int] = 0
-    speaker_points: Optional[int] = 0
-    login: str
+    role: Optional[str] = 'member'
+    amendments_submitted: Optional[conint(ge=0)] = 0
+    speaker_points: Optional[conint(ge=0)] = 0
+    login: constr(min_length=2)
 
 class CountryPatch(BaseModel):
     assigned_country: Optional[str] = None
@@ -22,50 +22,54 @@ class CountryPatch(BaseModel):
     delegate2: Optional[str] = None
     delegate3: Optional[str] = None
     delegate4: Optional[str] = None # no role here
-    amendments_submitted: Optional[int] = None
-    speaker_points: Optional[int] = None # is this allowed?
-    login: Optional[str] = None
+    amendments_submitted: Optional[conint(ge=0)] = None
+    speaker_points: Optional[conint(ge=0)] = None # is this allowed?
+    login: Optional[constr(min_length=2)] = None
     
 class Resolution(BaseModel):
     title: str
     council_id: str
-    clauses: int
-    submitter: int
-    seconder: int
-    negator: int
+    clauses: conint(ge=0)
+    submitter: conint(ge=0)
+    seconder: conint(ge=0)
+    negator: conint(ge=0)
 
 class ResolutionPatch(BaseModel):
     title: Optional[str] = None
     council_id: Optional[str] = None 
     status: Optional[str] = None
-    clauses: Optional[int] = None
-    submitter: Optional[int] = None
-    seconder: Optional[int] = None
-    negator: Optional[int] = None
+    clauses: Optional[conint(ge=0)] = None
+    submitter: Optional[conint(ge=0)] = None
+    seconder: Optional[conint(ge=0)] = None
+    negator: Optional[conint(ge=0)] = None
     url: Optional[str] = None
 
 class Amendment(BaseModel):
-    resolution_title: str
-    resolution_id: int
+    resolution_id: conint(ge=0)
     status: Optional[str] = 'pending review'
-    clause: int
-    submitter: list[int] 
+    clause: conint(ge=0)
+    submitter: list[conint(ge=0)] 
     content: str
 
 class AmendmentPatch(BaseModel):
-    resolution_title: Optional[str] = None
-    resolution_id: Optional[int] = None
+    resolution_id: Optional[conint(ge=0)] = None
     status: Optional[str] = None
-    clause: Optional[int] = None
-    submitter: Optional[list[int]] = None
+    clause: Optional[conint(ge=0)] = None
+    submitter: Optional[list[conint(ge=0)]] = None
     content: Optional[str] = None
 
 class Exec(BaseModel):
     name: str
     position: str
-    id: int
 
 class ExecPatch(BaseModel):
     name: Optional[str] = None
     position: Optional[str] = None
-    id: int
+
+class Council(BaseModel):
+    name: str
+    resolution_count: conint(ge=0)
+
+class CouncilPatch(BaseModel):
+    name: Optional[str] = None
+    resolution_count: Optional[int] = None

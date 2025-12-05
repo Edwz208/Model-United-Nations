@@ -6,12 +6,14 @@ import os
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 
-SECRET_KEY = os.getenv("SECRET_KEY")
 REFRESH_KEY = os.getenv("REFRESH_KEY")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_MINUTES = 10080 # 7 days
+SECRET_KEY = os.getenv("SECRET_KEY") 
+if not SECRET_KEY:
+    SECRET_KEY = "TEST_SECRET"
 
 
 async def hash(password: str) -> str:
@@ -34,18 +36,14 @@ def generateJwt(data: dict, KEY: str, time_minutes: float) -> str:
     encoded_jwt = jwt.encode(to_encode, KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def get_current_user(token: str) -> dict:
+async def get_current_user(token: str) -> dict:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials"
     )
     try: 
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        id = payload.get("id") 
-        if id is None:
-            raise credentials_exception
-        else: 
-            return payload
+        payload = await decode(token, SECRET_KEY)
+        return payload
     except InvalidTokenError: 
         raise credentials_exception
     
