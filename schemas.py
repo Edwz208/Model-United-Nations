@@ -49,14 +49,14 @@ class Amendment(BaseModel):
     resolution_id: conint(ge=0)
     status: Optional[str] = 'pending review'
     clause: conint(ge=0)
-    submitter: list[conint(ge=0)] 
+    submitter: conint(ge=0)
     content: str
 
 class AmendmentPatch(BaseModel):
     resolution_id: Optional[conint(ge=0)] = None
     status: Optional[str] = None
     clause: Optional[conint(ge=0)] = None
-    submitter: Optional[list[conint(ge=0)]] = None
+    submitter: Optional[conint(ge=0)] = None
     content: Optional[str] = None
 
 class Exec(BaseModel):

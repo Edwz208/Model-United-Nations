@@ -1,9 +1,8 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from schemas import Council, CouncilPatch
-from helpers import require_member_or_admin, require_admin, fetch_all, fetch_one, transaction, execute
 from fastapi.security import OAuth2PasswordBearer
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
+from helpers import require_member_or_admin, require_admin, fetch_all, fetch_one, transaction, execute
 router = APIRouter()
 
 async def getCouncilsList() -> list[dict]:

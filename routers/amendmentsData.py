@@ -1,11 +1,9 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from schemas import Amendment, AmendmentPatch
-from typing import Annotated
 from fastapi.security import OAuth2PasswordBearer
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-from helpers import require_member_or_admin, require_admin, require_specific_member_or_admin, transaction, get_cursor, fetch_all, fetch_one, execute
+from helpers import require_member_or_admin, require_specific_member_or_admin, transaction, get_cursor, fetch_all, fetch_one, execute
 router = APIRouter()
-
 
 async def getOwnAmendments(id: int) -> dict:
     ownAmendments = await fetch_all("""SELECT content,clause,resolution_id,submitter,status, modified_at, amendment_id from amendments WHERE (%s) = ANY(submitter)""", (id,))
@@ -14,6 +12,10 @@ async def getOwnAmendments(id: int) -> dict:
 async def getRecentAmendments() -> dict:
     recentAmendments = await fetch_all("""SELECT content, clause, resolution_id, submitter, status, modified_at, amendment_id from amendments ORDER BY modified_at DESC LIMIT 3""")
     return recentAmendments
+
+async def getAmendmentsPerResolution(resolution_id: int) -> list[dict]:
+    amendmentsForResolution = await fetch_all("""SELECT content,clause,resolution_id,submitter,status, modified_at, amendment_id from amendments WHERE resolution_id = %s""", (resolution_id,))
+    return amendmentsForResolution
         
 @router.get('/specific-amendment-country/{country_id}', status_code=status.HTTP_200_OK)
 async def specificCountryAmendment(country_id: int):
@@ -21,22 +23,18 @@ async def specificCountryAmendment(country_id: int):
     amendments = await getOwnAmendments(country_id)
     return amendments
 
-@router.get('/all-amendments', status_code=status.HTTP_200_OK)
-async def allAmendments(current_user=Depends(require_member_or_admin)):
-    result = await fetch_all('''SELECT content, clause, resolution_id, submitter, status, modified_at, amendment_id from amendments''')
-    print(result)
+@router.get('/all-amendments/{resolution_id}', status_code=status.HTTP_200_OK)
+async def allAmendmentsForResolution(resolution_id: int, current_user=Depends(require_member_or_admin)):
+    result = await getAmendmentsPerResolution(resolution_id)
     return result
-
 
 @router.post('/upload-amendment',status_code = status.HTTP_200_OK)
 async def uploading_amendment(amendment: Amendment, current_user=Depends(require_member_or_admin)):
     amendment_count = await fetch_one('''UPDATE resolutions SET amendment_count = amendment_count +1 WHERE number = %s RETURNING amendment_count''', (amendment.resolution_id,))
-    print(amendment_count.get("amendment_count"))
     amendment_id = f"{amendment.resolution_id}{amendment_count.get('amendment_count')}"
     addedAmendment = await fetch_one('''INSERT INTO amendments (content, clause, resolution_id, submitter, status, amendment_id) VALUES (%s,%s,%s,%s,%s,%s) returning *''', 
                                 (amendment.content, amendment.clause, amendment.resolution_id, amendment.submitter, amendment.status, amendment_id))
     return addedAmendment
-    
 
 @router.patch('/update-amendment/{number}')
 async def updateAmendment(number: int, amendment: AmendmentPatch, current_user=Depends(require_member_or_admin)):
@@ -70,6 +68,6 @@ async def deleteAmendment(number: int, current_user=Depends(require_member_or_ad
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Resolution {number} was not found",
+            detail=f"Amendment {number} was not found",
         )
-    return result
+    return {"status": "success", **result}

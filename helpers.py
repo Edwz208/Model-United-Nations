@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from db import get_async_pool  
 from fastapi.security import OAuth2PasswordBearer
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# from routers.councilsData import returnMainCouncil
 
 pool = get_async_pool
 
@@ -101,3 +102,24 @@ async def execute(query: str, params: tuple = (), cursor=None):
 
     async with get_cursor() as cur:
         return await cur.execute(query, params)
+    
+# async def link_country_to_councils(country_id: int, council_ids: list[int] = [], cursor=None):
+#     from copy import deepcopy
+#     council_ids = deepcopy(council_ids) 
+
+#     main_council = await returnMainCouncil()
+#     if main_council and main_council["council_id"] not in council_ids:
+#         council_ids.append(main_council["council_id"])
+
+#     await execute(
+#         "DELETE FROM country_council WHERE country_id = %s AND council_id NOT IN %s",
+#         (country_id, tuple(council_ids)),
+#         cursor=cursor
+#     )
+
+#     for cid in council_ids:
+#         await execute(
+#             "INSERT INTO country_council (country_id, council_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+#             (country_id, cid),
+#             cursor=cursor
+#         )

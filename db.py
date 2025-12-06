@@ -5,15 +5,6 @@ from dotenv import load_dotenv
 load_dotenv() # must keep
 conninfo = os.getenv("DATABASE_URL")
 
-USER = os.getenv("user")
-PASSWORD = os.getenv("password")
-HOST = os.getenv("host")
-PORT = os.getenv("port")
-DBNAME = os.getenv("dbname")
-
-conninfo = (
-    "postgresql://postgres.xxrjiyweylckankmegwc:2RzmfylGePVniB4@aws-1-ca-central-1.pooler.supabase.com:5432/postgres"
-)
 @lru_cache() # decorator that all function calls with the same arguments use the same instance of the object, thus using the same pool and connections
 def get_async_pool() -> AsyncConnectionPool:
     return AsyncConnectionPool(conninfo=conninfo,

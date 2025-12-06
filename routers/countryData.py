@@ -11,7 +11,6 @@ from helpers import require_admin, require_member_or_admin, fetch_all, fetch_one
 
 router = APIRouter()
 
-
 def sanitizeKey(key: str) -> str:
     return key.strip().lower().replace("#", "").replace(" ", "_")
 
@@ -77,6 +76,7 @@ async def sheetExport(current_user = Depends(require_admin)):
                 row["role"],
             )
         )
+        
         return data
 
 # update single country
@@ -141,7 +141,6 @@ async def updateCountryCouncils(country_id: int, council_ids: list[int], current
         for cid in council_ids:
             await execute("INSERT INTO country_council (country_id, council_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (country_id, cid), cursor=cursor)
     return {"status": "success"}
-
 
 @router.get("/select-country/{id}",status_code = status.HTTP_200_OK)
 async def selectCountry(id: int, current_user=Depends(require_member_or_admin)):

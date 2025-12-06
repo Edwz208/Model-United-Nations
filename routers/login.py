@@ -31,8 +31,8 @@ def logout(response: Response):
 async def refresh_token(request: Request):
     token = request.cookies.get("refresh_token")
     print(f"Refresh token from cookies: {token}")
-    payload = await decode(token, REFRESH_KEY)
     if token:
+        payload = await decode(token, REFRESH_KEY)
         newAccess = generateJwt(payload, SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES)
         return {"accessToken": newAccess, "role": payload["role"], "country": payload["country"], "id": payload["id"]}
     else:
