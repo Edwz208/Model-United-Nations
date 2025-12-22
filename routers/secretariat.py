@@ -1,35 +1,27 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, status, Depends
 from schemas import Exec, ExecPatch
-from helpers import require_admin, fetch_all, fetch_one
-
+from auth.dependencies import require_admin
+from services.secretariat import post_exec_service, delete_exec_service, update_exec_service
+from typing import Any
+from db.utils import fetch_all
 router = APIRouter()
 
 @router.post("/set-exec", status_code = status.HTTP_200_OK)
-async def setExec(person: Exec, current_user=Depends(require_admin)):
-    execSet = await fetch_one('''INSERT INTO secretariat (name, position) VALUES (%s,%s) RETURNING name, position, secretariat_id;''', (person.name, person.position))
+async def set_exec(person: Exec, current_user=Depends(require_admin)) -> dict[str, Any]:
+    execSet = await post_exec_service(person.name, person.position)
     return {"message": "success", **execSet}
         
 @router.get("/get-secretariat", status_code = status.HTTP_200_OK)
-async def getAllExecs():
+async def get_all_execs() -> list[dict[str, Any]]:
     allExecs = await fetch_all('''SELECT name, position, secretariat_id from secretariat''')
     return allExecs
         
 @router.delete('/delete-secretariat/{secretariat_id}', status_code = status.HTTP_200_OK)
-async def deleteExec(secretariat_id: int, current_user=Depends(require_admin)):
-    result = await fetch_one('''DELETE FROM secretariat WHERE secretariat_id = %s RETURNING name, position, secretariat_id''', (secretariat_id,))
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Secretariat not found",
-        )
+async def delete_exec(secretariat_id: int, current_user=Depends(require_admin)) -> dict[str, Any]:
+    result = await delete_exec_service(secretariat_id)
     return {"message": "success", **result}
     
 @router.patch('/update-secretariat/{secretariat_id}', status_code = status.HTTP_200_OK)
-async def updateExec(exec: ExecPatch, secretariat_id: int, current_user=Depends(require_admin)):
-    result = await fetch_one('''UPDATE secretariat SET name = COALESCE(%s, name), position = COALESCE(%s, position) WHERE secretariat_id = %s RETURNING *''', (exec.name, exec.position, secretariat_id,))
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Secretariat not found",
-        )
+async def update_exec(exec: ExecPatch, secretariat_id: int, current_user=Depends(require_admin)) -> dict[str, Any]:
+    result = await update_exec_service(exec.name, exec.position, secretariat_id)
     return {"message": "success", **result}
