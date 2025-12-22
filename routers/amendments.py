@@ -28,7 +28,7 @@ async def allAmendmentsForResolution(resolution_id: int, current_user=Depends(re
 
 @router.post('/upload-amendment',status_code = status.HTTP_200_OK)
 async def uploading_amendment(amendment: Amendment, current_user=Depends(require_member_or_admin)):
-    amendment_count = await fetch_one('''UPDATE resolutions SET amendment_count = amendment_count +1 WHERE number = %s RETURNING amendment_count''', (amendment.resolution_id,))
+    amendment_count = await fetch_one('''UPDATE resolutions SET amendment_count = amendment_count +1 WHERE number = %s RETURNING amendment_count''', (amendment.resolution_id,)) or {}
     amendment_id = f"{amendment.resolution_id}{amendment_count.get('amendment_count')}"
     addedAmendment = await fetch_one('''INSERT INTO amendments (content, clause, resolution_id, submitter, status, amendment_id) VALUES (%s,%s,%s,%s,%s,%s) returning *''', 
                                 (amendment.content, amendment.clause, amendment.resolution_id, amendment.submitter, amendment.status, amendment_id))
