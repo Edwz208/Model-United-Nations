@@ -1,15 +1,15 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from schemas import Council, CouncilPatch
-from fastapi.security import OAuth2PasswordBearer
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-from helpers import require_member_or_admin, require_admin, fetch_all, fetch_one, transaction, execute
+from auth.dependencies import require_member_or_admin, require_admin
+from db.utils import fetch_all, fetch_one, transaction, execute
 router = APIRouter()
+from typing import Any
 
-async def getCouncilsList() -> list[dict]:
-    allCouncils = await fetch_all('''SELECT council_id, name, resolution_count from councils''') or []
+async def getCouncilsList() -> list[dict[str, Any]]:
+    allCouncils = await fetch_all('''SELECT council_id, name, resolution_count from councils''')
     return allCouncils
 
-async def returnMainCouncil() -> dict:
+async def returnMainCouncil() -> dict[str, Any] | None:
     mainCouncil = await fetch_one('''SELECT council_id, name, resolution_count from councils WHERE is_main = TRUE''')
     return mainCouncil
 
@@ -20,8 +20,13 @@ async def genResolutionsRoute(current_user=Depends(require_member_or_admin)):
 
 @router.post("/set-council", status_code = status.HTTP_200_OK)
 async def setCouncil(council: Council, current_user=Depends(require_admin)):
-    councilSet = await fetch_one('''INSERT INTO secretariat (name, resolution_count) VALUES (%s,%s) RETURNING *;''', (council.name, council.resolution_count))
-    return {"status": "success", **councilSet}
+    councilSet = await fetch_one('''INSERT INTO councils (name, resolution_count) VALUES (%s,%s) RETURNING name, resolution_count, council_id;''', (council.name, council.resolution_count))
+    if not councilSet:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to create council",
+        )
+    return {"message": "success", **councilSet}
         
 @router.delete('/delete-council/{council_id}', status_code = status.HTTP_200_OK)
 async def deleteCouncil(council_id: int, current_user=Depends(require_admin)):
@@ -31,18 +36,18 @@ async def deleteCouncil(council_id: int, current_user=Depends(require_admin)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Council not found",
         )
-    return {"status": "success", **result}
+    return {"message": "success", **result}
     
 @router.patch('/update-council/{council_id}', status_code = status.HTTP_200_OK)
-async def updateCouncil(council: CouncilPatch, id: int, current_user=Depends(require_admin)):
+async def updateCouncil(council: CouncilPatch, council_id: int, current_user=Depends(require_admin)):
 
-    result = await fetch_one('''UPDATE council SET name = COALESCE(%s, name), resolution_count = COALESCE(%s, resolution_count) WHERE council_id = %s RETURNING *''', (council.name, council.resolution_count, id,))
+    result = await fetch_one('''UPDATE council SET name = COALESCE(%s, name), resolution_count = COALESCE(%s, resolution_count) WHERE council_id = %s RETURNING *''', (council.name, council.resolution_count, council_id,))
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Council not found",
         )
-    return {"status": "success", **result}
+    return {"message": "success", **result}
 
 @router.patch('/update-main-council/{council_id}', status_code=status.HTTP_200_OK)
 async def updateMainCouncil(council_id: int, current_user=Depends(require_admin)):
@@ -54,4 +59,4 @@ async def updateMainCouncil(council_id: int, current_user=Depends(require_admin)
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Council not found",
         )
-    return {"status": "success", **result}
+    return {"message": "success", **result}

@@ -1,23 +1,25 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from routers import countryData, login, resolutionsData, amendmentsData
+# from dotenv import load_dotenv, find_dotenv
+# # make sure this goes before any imports
+# dotenv_path = find_dotenv()
+# load_dotenv(dotenv_path)
+
+from routers.login import router as login_router
+from backend.routers.countries import router as countries_data_router
+from backend.routers.resolutions import router as resolutions_data_router
+from backend.routers.amendments import router as amendments_data_router
+from backend.routers.councils import router as councils_data_router
+from backend.routers.secretariat import router as secretariat_data_router
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-from dotenv import load_dotenv, find_dotenv
-
-from db import get_async_pool
+from backend.db.connection import get_async_pool
 from contextlib import asynccontextmanager
 import asyncio  
-from authentication import get_current_user
+from auth.dependencies import get_current_user
 
 import json
-import os
-dotenv_path = find_dotenv()
-load_dotenv(dotenv_path)
-origins = [
-    "http://localhost:8000",
-    "http://localhost:5173",
-]   
 
 async def check_async_connections() -> None:
     while True:
@@ -35,7 +37,10 @@ async def lifespan_handler(app: FastAPI):
     await get_async_pool().close()
 
 app = FastAPI(lifespan=lifespan_handler)
-
+origins = [
+    "http://localhost:8000",
+    "http://localhost:5173",
+]   
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -46,10 +51,12 @@ app.add_middleware(
     
 app.mount("/resolutions-pdfs", StaticFiles(directory="uploads/resolutions"), name="pdfs") # served from localhost80000 because server
 
-app.include_router(login.router) # APIRouter() is used to separate the routes into multiple files
-app.include_router(countryData.router)
-app.include_router(resolutionsData.router)
-app.include_router(amendmentsData.router)
+app.include_router(login_router) 
+app.include_router(countries_data_router)
+app.include_router(resolutions_data_router)
+app.include_router(amendments_data_router)
+app.include_router(councils_data_router)
+app.include_router(secretariat_data_router)
 
 
 class ConnectionManager:
@@ -84,7 +91,7 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             token = json.loads(data).get("accessToken")
-            payload = get_current_user(token)
+            payload = await get_current_user(token)
             if payload.get("role") == 'member':
                 message = {"message": data} 
                 await manager.broadcast(json.dumps(message))

@@ -2,8 +2,6 @@ import pytest
 from authentication import hash, verify, decode, generateJwt, get_current_user
 from fastapi import HTTPException
 
-
-
 @pytest.mark.asyncio
 async def test_hash_and_verify():
     password = "mypassword123"

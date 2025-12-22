@@ -24,16 +24,16 @@ class CountryPatch(BaseModel):
     delegate3: Optional[str] = None
     delegate4: Optional[str] = None # no role here
     amendments_submitted: Annotated[Optional[int], Field(strict=True, ge=0)] = None
-    speaker_points: Annotated[Optional[int], Field(strict=True, ge=0)] = None # is this allowed?
-    login: Annotated[str, Field(strict=True, min_length=4)] # use pydantic types for domain rule not api rules, e.g for creating a type
+    speaker_points: Annotated[Optional[int], Field(strict=True, ge=0)] = None
+    login: Annotated[Optional[str], Field(strict=True, min_length=4)] = None # use pydantic types for domain rule not api rules, e.g for creating a type
     
 class Resolution(BaseModel):
     title: str
     council_id: str
-    clauses: Annotated[int, Field(strict=True, ge=0)]
-    submitter: Annotated[int, Field(strict=True, ge=0)]
-    seconder: Annotated[int, Field(strict=True, ge=0)]
-    negator: Annotated[int, Field(strict=True, ge=0)]
+    clauses: Annotated[int, Field(ge=0)]
+    submitter: Annotated[int, Field(ge=0)]
+    seconder: Annotated[int, Field(ge=0)]
+    negator: Annotated[int, Field(ge=0)]
 
 class ResolutionPatch(BaseModel):
     title: Optional[str] = None

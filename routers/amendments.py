@@ -1,15 +1,14 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from schemas import Amendment, AmendmentPatch
-from fastapi.security import OAuth2PasswordBearer
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-from helpers import require_member_or_admin, require_specific_member_or_admin, transaction, get_cursor, fetch_all, fetch_one, execute
+from auth.dependencies import require_member_or_admin, require_specific_member_or_admin
+from db.utils import transaction, get_cursor, fetch_all, fetch_one, execute
 router = APIRouter()
 
-async def getOwnAmendments(id: int) -> dict:
+async def getOwnAmendments(id: int) -> list[dict]:
     ownAmendments = await fetch_all("""SELECT content,clause,resolution_id,submitter,status, modified_at, amendment_id from amendments WHERE (%s) = ANY(submitter)""", (id,))
     return ownAmendments
         
-async def getRecentAmendments() -> dict:
+async def getRecentAmendments() -> list[dict]:
     recentAmendments = await fetch_all("""SELECT content, clause, resolution_id, submitter, status, modified_at, amendment_id from amendments ORDER BY modified_at DESC LIMIT 3""")
     return recentAmendments
 
@@ -18,8 +17,7 @@ async def getAmendmentsPerResolution(resolution_id: int) -> list[dict]:
     return amendmentsForResolution
         
 @router.get('/specific-amendment-country/{country_id}', status_code=status.HTTP_200_OK)
-async def specificCountryAmendment(country_id: int):
-    await require_specific_member_or_admin(country_id)    
+async def specificCountryAmendment(country_id: int, current_user=Depends(require_specific_member_or_admin)):
     amendments = await getOwnAmendments(country_id)
     return amendments
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form, Depends
-from db import get_async_pool
+from backend.db.connection import get_async_pool
 from pydantic import ValidationError
 from psycopg.rows import dict_row
 from schemas import Resolution, ResolutionPatch
@@ -9,10 +9,10 @@ from uuid import uuid4
 import re
 from typing import Annotated, Optional
 from psycopg.errors import UniqueViolation, ForeignKeyViolation
-from authentication import get_current_user
+from helpers import transaction, get_cursor, require_admin
+from backend.db.connection import get_async_pool  
 from fastapi.security import OAuth2PasswordBearer
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token") #token url only for swagger 
-from helpers import transaction, get_cursor
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # For resolutions, we allow admin to change the order of resolutions, change the order of multiple at once after saving to make it one call to the server
 def sanitize_filename(name: str) -> str:
@@ -69,48 +69,42 @@ async def specificResolution(token: Annotated[str, Depends(oauth2_scheme)], numb
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to view resolutions")
         
 @router.post('/upload-resolution',status_code = status.HTTP_200_OK)
-async def uploading_resolution(
-    token: Annotated[str, Depends(oauth2_scheme)], #put non default arguments before default arguments Depends is non deafult
+async def uploading_resolution(#put non default arguments before default arguments Depends is non deafult
     council_id: str = Form(...),
     title: str = Form(...),
-    clauses: int = Form(...),
+    clauses: str = Form(...),
     submitter: str = Form(...),
     seconder: str = Form(...),
     negator: str = Form(...),
     file: UploadFile = File(...),
+    current_user = Depends(require_admin)
     # missing status, amendment_count
 ):
-
-    payload = await get_current_user(token)
-    if payload.get("role") == 'admin':
-        url = fileToDirectory(file)
-        try:
-            resolutionData = Resolution(council_id=council_id,title = title, clauses=clauses, status="pending", submitter = submitter, seconder=seconder, negator=negator)
-        except ValidationError as e: # auto pydantic handling only done if in direct call to endpoint
-            raise HTTPException(status_code=422, detail=e)
-        try: 
-            async with pool.connection() as conn:
-                async with conn.cursor(row_factory=dict_row) as cursor:
-                    await cursor.execute('''UPDATE councils SET resolution_count = resolution_count + 1 WHERE council_id = %s RETURNING *''', (council_id,))
-                    number = await cursor.fetchone()
-                    if len(number.get('resolution_count')) == 1:
-                        number['resolution_count'] = f"0{number.get('resolution_count')}"
-                    if len(council_id) == 1:
-                        council_id_as_string = f'0{council_id}'
-                    resolution_id = f"{council_id_as_string}{number.get('resolution_count')}"
-                    print("resolution_id",resolution_id)
-                    await cursor.execute('''INSERT INTO resolutions (council_id, title, url, number, clauses, submitter, seconder, negator) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) returning *''', 
-                                (council_id,title,url,int(resolution_id),clauses,submitter,seconder,negator))
-                    addedRes = await cursor.fetchone()
-            return {"resolution": addedRes}
-        except UniqueViolation:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Resolution with this number/title already exists")
-        except ForeignKeyViolation:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Council/Country not found")
-    else: 
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to upload resolutions")
-        
-# delete resolution
+    url = fileToDirectory(file)
+    try:
+        print('hi')
+        resolutionData = Resolution(council_id=council_id,title = title, clauses=clauses, submitter=submitter, seconder=seconder, negator=negator)
+    except ValidationError as e: # auto pydantic handling only done if in direct call to endpoint
+        raise HTTPException(status_code=422, detail=e)
+    try: 
+        async with pool.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as cursor:
+                await cursor.execute('''UPDATE councils SET resolution_count = resolution_count + 1 WHERE council_id = %s RETURNING *''', (council_id,))
+                number = await cursor.fetchone()
+                if len(number.get('resolution_count')) == 1:
+                    number['resolution_count'] = f"0{number.get('resolution_count')}"
+                if len(council_id) == 1:
+                    council_id_as_string = f'0{council_id}'
+                resolution_id = f"{council_id_as_string}{number.get('resolution_count')}"
+                print("resolution_id",resolution_id)
+                await cursor.execute('''INSERT INTO resolutions (council_id, title, url, number, clauses, submitter, seconder, negator) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) returning *''', 
+                            (council_id,title,url,int(resolution_id),clauses,submitter,seconder,negator))
+                addedRes = await cursor.fetchone()
+        return {"resolution": addedRes}
+    except UniqueViolation:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Resolution with this number/title already exists")
+    except ForeignKeyViolation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Council/Country not found")
 
 @router.delete('/delete-resolution/{number}', status_code=status.HTTP_200_OK)
 async def deleteResolution(token: Annotated[str, Depends(oauth2_scheme)], number: str):

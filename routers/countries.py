@@ -5,31 +5,29 @@ import io
 import os
 from schemas import Country, CountryPatch
 from random import randrange
-from fastapi.security import OAuth2PasswordBearer
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 from helpers import require_admin, require_member_or_admin, fetch_all, fetch_one, execute, get_cursor, transaction
-
+from typing import Any
 router = APIRouter()
 
 def sanitizeKey(key: str) -> str:
     return key.strip().lower().replace("#", "").replace(" ", "_")
 
-async def getCountriesGeneral() -> list[dict]:
-    allCountries = await fetch_all("""SELECT name, amendments_submitted, speaker_points, country_id from countries WHERE role = %s ORDER BY country ASC""", ('member',))
+async def getCountriesGeneral() -> list[dict[str, Any]]:
+    allCountries = await fetch_all('''SELECT name, amendments_submitted, speaker_points, country_id from countries WHERE role = %s ORDER BY name ASC''', ('member',))
     return allCountries
 
 async def getCountriesPerCouncil(council_id: int) -> list[dict]:
-    countriesInCouncil = await fetch_all("""SELECT c.name, c.amendments_submitted, c.speaker_points, c.country_id FROM countries c JOIN country_council cc ON c.country_id = cc.country_id WHERE cc.council_id = %s AND c.role = %s ORDER BY c.name ASC """, (council_id, 'member'))
+    countriesInCouncil = await fetch_all('''SELECT c.name, c.amendments_submitted, c.speaker_points, c.country_id FROM countries c JOIN country_council cc ON c.country_id = cc.country_id WHERE cc.council_id = %s AND c.role = %s ORDER BY c.name ASC ''', (council_id, 'member'))
     return countriesInCouncil
         
 async def personalProfile(id: int) -> dict:
-        personalCountry = await fetch_one("""SELECT name, delegate1, delegate2, delegate3, delegate4, login, amendments_submitted, speaker_points, country_id, role from countries WHERE country_id = %s""", (id,))
+        personalCountry = await fetch_one('''SELECT name, delegate1, delegate2, delegate3, delegate4, login, amendments_submitted, speaker_points, country_id, role from countries WHERE country_id = %s''', (id,))
         if not personalCountry:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country with id {id} does not exist.")
         return personalCountry
 
 async def specificProfile(id: int) -> dict:
-    specificCountry = await fetch_one("""SELECT name, delegate1, delegate2, delegate3, delegate4, amendments_submitted, speaker_points, country_id from countries WHERE country_id = %s""", (id,))
+    specificCountry = await fetch_one('''SELECT name, delegate1, delegate2, delegate3, delegate4, amendments_submitted, speaker_points, country_id from countries WHERE country_id = %s''', (id,))
     if not specificCountry:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country with id {id} does not exist.")
     return specificCountry
@@ -39,7 +37,7 @@ async def uniqueLogin() -> str:
         while True:
             randomNum = str(randrange(100000, 1000000)) #unhashed for now
             result = await fetch_one("""SELECT exists (SELECT 1 FROM countries WHERE login = %s LIMIT 1);""", (randomNum,), cursor=cursor)
-            if not result["exists"]:
+            if not result.get("exists"):
                 return randomNum 
 
 @router.get("/sheet-export",status_code = status.HTTP_200_OK)
@@ -58,14 +56,14 @@ async def sheetExport(current_user = Depends(require_admin)):
         del row["school"]
         row["role"] = 'member'
         await execute(
-            """INSERT INTO countries (name, delegate1, delegate2, delegate3, delegate4, login, role) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (name) DO UPDATE
+            '''INSERT INTO countries (name, delegate1, delegate2, delegate3, delegate4, login, role) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (name) DO UPDATE
             SET delegate1 = EXCLUDED.delegate1,
             delegate2 = EXCLUDED.delegate2,
             delegate3 = EXCLUDED.delegate3,
             delegate4 = EXCLUDED.delegate4,
             login = CASE WHEN countries.login IS NULL OR countries.login = '' THEN EXCLUDED.login
             ELSE countries.login END,
-            role = EXCLUDED.role;""",
+            role = EXCLUDED.role;''',
             (
                 row["assigned_country"],
                 row["delegate_1"],
@@ -79,7 +77,7 @@ async def sheetExport(current_user = Depends(require_admin)):
         
         return data
 
-# update single country
+
 @router.patch('/update-single-country',status_code = status.HTTP_200_OK)
 async def updateOneCountry(country: CountryPatch, current_user=Depends(require_member_or_admin)):
     if country.get('role') != 'admin':
@@ -117,13 +115,14 @@ async def updateOneCountry(country: CountryPatch, current_user=Depends(require_m
 async def addOneCountry(country: Country, current_user=Depends(require_admin), council_ids: list[int] = []):
     async with transaction() as cursor:
         result = await fetch_one("""INSERT INTO countries (name, delegate1, delegate2, delegate3, delegate4, role, login, amendments_submitted, speaker_points) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING country_id, name;""", (country.assigned_country, country.delegate1, country.delegate2, country.delegate3, country.delegate4, country.role, country.login, country.amendments_submitted, country.speaker_points), cursor=cursor)
-        country_id = result["country_id"]
+        country_id = result.get("country_id")
         for council_id in council_ids:
             await execute("""INSERT INTO country_council (country_id, council_id) VALUES (%s, %s) ON CONFLICT (country_id, council_id) DO NOTHING;""", (country_id, council_id), cursor=cursor)
         return result
 
 @router.get("/get-countries", status_code = status.HTTP_200_OK)
 async def getAllCountries(current_user=Depends(require_member_or_admin)):
+    print("reached this point")
     allCountries = await getCountriesGeneral()
     print(allCountries)
     return allCountries
@@ -155,7 +154,6 @@ async def selectCountry(id: int, current_user=Depends(require_member_or_admin)):
         )
     return result
 
-# delete
 @router.delete("/select-country/{id}", status_code = status.HTTP_200_OK)
 async def deleteCountry(id: str, current_user=Depends(require_admin)):
     result = await fetch_one("""DELETE FROM countries WHERE country_id = %s AND role != 'admin' RETURNING *""", (id,))

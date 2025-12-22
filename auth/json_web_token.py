@@ -2,16 +2,17 @@ from passlib.context import CryptContext
 import asyncio
 import jwt
 from jwt.exceptions import InvalidTokenError
-import os
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
+from config import settings
 
-REFRESH_KEY = os.getenv("REFRESH_KEY")
+REFRESH_KEY = settings.REFRESH_KEY
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15
-REFRESH_TOKEN_EXPIRE_MINUTES = 10080 # 7 days
-SECRET_KEY = os.getenv("SECRET_KEY") 
+ALGORITHM = settings.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MINUTES
+
+SECRET_KEY = settings.SECRET_KEY
 if not SECRET_KEY:
     SECRET_KEY = "TEST_SECRET"
 
@@ -28,25 +29,9 @@ async def decode(token: str, key: str) -> dict:
     except InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-
 def generateJwt(data: dict, KEY: str, time_minutes: float) -> str:
     to_encode = data.copy() # must generate copy becausue dict is mutable
     expire = datetime.now(timezone.utc) + timedelta(minutes=time_minutes)
     to_encode["exp"] = expire
     encoded_jwt = jwt.encode(to_encode, KEY, algorithm=ALGORITHM)
     return encoded_jwt
-
-async def get_current_user(token: str) -> dict:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials"
-    )
-    try: 
-        payload = await decode(token, SECRET_KEY)
-        return payload
-    except InvalidTokenError: 
-        raise credentials_exception
-    
-        
-
-        
