@@ -29,7 +29,7 @@ async def check_async_connections() -> None:
         
 @asynccontextmanager # Async context manager allows for an async function to set up and remove resources upon startup and shutdown
 async def lifespan_handler(app: FastAPI):
-    await get_async_pool().open()
+    await get_async_pool().open() # not needed for tests, itll create a conn when needed
     
     task = asyncio.create_task(check_async_connections()) # background task that constantly occurs, at the same time as other event based tasks
     yield # pause here until the app is shutting down

@@ -1,0 +1,128 @@
+
+from typing import Any
+from db.utils import get_cursor, fetch_all, fetch_one, transaction, execute
+from fastapi import HTTPException, status
+from random import randrange
+from schemas import CountryPatch
+from config import settings
+from utils.countries import sanitize_key
+import requests
+import csv
+import io
+
+async def get_countries_general_service() -> list[dict[str, Any]]:
+    allCountries = await fetch_all('''SELECT name, amendments_submitted, speaker_points, country_id from countries WHERE role = %s ORDER BY name ASC''', ('member',))
+    return allCountries
+
+async def get_countries_in_council_service(council_id: int) -> list[dict[str, Any]]:
+    countriesInCouncil = await fetch_all('''SELECT c.name, c.amendments_submitted, c.speaker_points, c.country_id FROM countries AS c JOIN country_council AS cc ON c.country_id = cc.country_id WHERE cc.council_id = %s AND c.role = %s ORDER BY c.name ASC ''', (council_id, 'member'))
+    return countriesInCouncil
+        
+async def personal_profile_service(id: int) -> dict[str, Any]:
+        personalCountry = await fetch_one('''SELECT c.name, c.delegate1, c.delegate2, c.delegate3, c.delegate4, c.login, c.amendments_submitted, c.speaker_points, c.country_id, c.role from countries c INNER JOIN country_council cc ON cc.country_id = c.country_id WHERE c.country_id = %s UNION SELECT co.council_id FROM councils co WHERE co.is_main = True''', (id,))
+        # use where not and
+        if not personalCountry:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country with id {id} does not exist.")
+        return personalCountry
+
+async def specific_profile_service(id: int) -> dict[str, Any]:
+    specificCountry = await fetch_one('''SELECT c.name, c.delegate1, c.delegate2, c.delegate3, c.delegate4, c.amendments_submitted, c.speaker_points, c.country_id from countries c INNER JOIN country_council cc ON c.country_id = cc.country_id WHERE country_id = %s''', (id,))
+    if not specificCountry:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country with id {id} does not exist.")
+    return specificCountry
+
+async def get_single_country_service(target_id: int, sender_id: int, role: str) -> dict[str, Any]: 
+    if sender_id == target_id or 'admin' == role:
+        result = await personal_profile_service(target_id)
+    else:
+        result = await specific_profile_service(target_id)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Country with id {target_id} was not found",
+    )
+    return result
+
+async def update_country_service(country: CountryPatch) -> dict[str, Any]:
+    country_data = country.model_dump(exclude_unset=True)
+    query = '''
+        UPDATE countries
+        SET
+        name = COALESCE(%s, name),
+        delegate1 = COALESCE(%s, delegate1),
+        delegate2 = COALESCE(%s, delegate2),
+        delegate3 = COALESCE(%s, delegate3),
+        delegate4 = COALESCE(%s, delegate4),
+        login = COALESCE(%s, login),
+        amendments_submitted = COALESCE(%s, amendments_submitted),
+        speaker_points = COALESCE(%s, speaker_points)
+        WHERE country_id = %s
+        RETURNING name, delegate1, delegate2, delegate3, delegate4, login, amendments_submitted, speaker_points, country_id;
+        '''
+    params = (
+        country_data.get("assigned_country"),
+        country_data.get("delegate1"),
+        country_data.get("delegate2"),
+        country_data.get("delegate3"),
+        country_data.get("delegate4"),
+        country_data.get("login"),
+        country_data.get("amendments_submitted"),
+        country_data.get("speaker_points"),
+        country_data.get("id"),
+    )
+    result = await fetch_one(query, params)
+    if not result: 
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country not found")
+    return result
+
+async def delete_country_service(id: int) -> dict[str, Any]:
+
+    result = await fetch_one('''DELETE FROM countries WHERE country_id = %s AND role != 'admin' RETURNING name, delegate1, delegate2, delegate3, delegate4, login, amendments_submitted, speaker_points, country_id''', (id,))
+    # cascades to country_council
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country not found")
+    return result
+
+async def unique_login_service() -> str:
+    async with get_cursor() as cursor:
+        while True:
+            randomNum = str(randrange(100000, 1000000)) #unhashed for now
+            result = await fetch_one('''SELECT exists (SELECT 1 FROM countries WHERE login = %s LIMIT 1);''', (randomNum,), cursor=cursor) or {}
+            if not result.get("exists"):
+                return randomNum 
+
+async def sheet_export_service() -> None: # need async? 
+    url = settings.SPREADSHEET
+    response = requests.get(url)
+    csvString = response.text
+    f = io.StringIO(csvString)
+    firstLine = next(f)
+    rawKeys = firstLine.strip().split(",")
+    sanitizedKeys = [sanitize_key(name) for name in rawKeys]
+    reader = csv.DictReader(f, fieldnames=sanitizedKeys)
+    data = list(reader)
+    print(data)
+    async with transaction() as cursor:
+        for row in data:
+            row.pop("school", None)
+            row["role"] = 'member'
+            await execute(
+                '''INSERT INTO countries (name, delegate1, delegate2, delegate3, delegate4, login, role) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (name) DO UPDATE
+                SET delegate1 = EXCLUDED.delegate1,
+                delegate2 = EXCLUDED.delegate2,
+                delegate3 = EXCLUDED.delegate3,
+                delegate4 = EXCLUDED.delegate4,
+                login = CASE WHEN countries.login IS NULL OR countries.login = '' THEN EXCLUDED.login
+                ELSE countries.login END,
+                role = EXCLUDED.role;''',
+                (
+                    row.get("assigned_country"),
+                    row.get("delegate_1"),
+                    row.get("delegate_2"),
+                    row.get("delegate_3"),
+                    row.get("delegate_4"),
+                    await unique_login_service(),
+                    row.get("role"),
+                ), cursor=cursor
+            )
+        

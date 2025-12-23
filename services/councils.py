@@ -11,7 +11,7 @@ async def get_main_council_service() -> dict[str, Any] | None:
     return result
 
 async def post_council_service(name: str, resolution_count: int) -> dict[str,Any]:
-    result = await fetch_one('''INSERT INTO councils (name, resolution_count) VALUES (%s,%s) RETURNING name, resolution_count, council_id;''', (name, resolution_count))
+    result = await fetch_one('''INSERT INTO councils (name, resolution_count) VALUES (%s,%s) RETURNING name, resolution_count, council_id''', (name, resolution_count))
     if not result:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -29,7 +29,7 @@ async def delete_council_service(council_id: int) -> dict[str, Any]:
     return result
 
 async def update_council_service(name: str | None, resolution_count: int | None, council_id: int) -> dict[str, Any]:
-    result = await fetch_one('''UPDATE council SET name = COALESCE(%s, name), resolution_count = COALESCE(%s, resolution_count) WHERE council_id = %s RETURNING *''', (name, resolution_count, council_id,))
+    result = await fetch_one('''UPDATE council SET name = COALESCE(%s, name), resolution_count = COALESCE(%s, resolution_count) WHERE council_id = %s RETURNING council_id, name, resolution_count''', (name, resolution_count, council_id,))
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
