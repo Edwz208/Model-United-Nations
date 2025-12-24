@@ -10,7 +10,6 @@ async def get_current_user(token: str) -> dict[str, Any]:
     return payload
 
 async def require_admin(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
-    print(token)
     payload = await get_current_user(token)
     if payload.get("role") != "admin":
         raise HTTPException(status_code=401, detail="Unauthorized")

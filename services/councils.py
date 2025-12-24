@@ -7,7 +7,7 @@ async def get_all_councils_service() -> list[dict[str, Any]]:
     return result
 
 async def get_main_council_service() -> dict[str, Any] | None:
-    result = await fetch_one('''SELECT council_id, name, resolution_count from councils WHERE is_main = TRUE''')
+    result = await fetch_one('''SELECT council_id from councils WHERE is_main = TRUE''')
     return result
 
 async def post_council_service(name: str, resolution_count: int) -> dict[str,Any]:

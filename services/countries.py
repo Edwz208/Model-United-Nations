@@ -19,17 +19,85 @@ async def get_countries_in_council_service(council_id: int) -> list[dict[str, An
     return countriesInCouncil
         
 async def personal_profile_service(id: int) -> dict[str, Any]:
-        personalCountry = await fetch_one('''SELECT c.name, c.delegate1, c.delegate2, c.delegate3, c.delegate4, c.login, c.amendments_submitted, c.speaker_points, c.country_id, c.role from countries c INNER JOIN country_council cc ON cc.country_id = c.country_id WHERE c.country_id = %s UNION SELECT co.council_id FROM councils co WHERE co.is_main = True''', (id,))
-        # use where not and
-        if not personalCountry:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country with id {id} does not exist.")
-        return personalCountry
+    country = await fetch_one(
+        '''
+        SELECT
+            c.name,
+            c.delegate1,
+            c.delegate2,
+            c.delegate3,
+            c.delegate4,
+            c.login,
+            c.amendments_submitted,
+            c.speaker_points,
+            c.country_id,
+            c.role,
+            array_agg(cc.council_id) AS councils,
+            MAX(
+                CASE
+                    WHEN co.is_main THEN co.council_id
+                    ELSE NULL
+                END
+            ) AS main_council
+        FROM countries c
+        JOIN country_council cc ON cc.country_id = c.country_id
+        JOIN councils co ON co.council_id = cc.council_id
+        WHERE c.country_id = %s
+        GROUP BY
+            c.name, c.delegate1, c.delegate2, c.delegate3,
+            c.delegate4, c.login, c.amendments_submitted,
+            c.speaker_points, c.country_id, c.role
+        ''',
+        (id,)
+    )
+
+    if not country:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Country with id {id} does not exist."
+        )
+
+    return country
 
 async def specific_profile_service(id: int) -> dict[str, Any]:
-    specificCountry = await fetch_one('''SELECT c.name, c.delegate1, c.delegate2, c.delegate3, c.delegate4, c.amendments_submitted, c.speaker_points, c.country_id from countries c INNER JOIN country_council cc ON c.country_id = cc.country_id WHERE country_id = %s UNION SELECT co.council_id FROM councils co WHERE co.is_main = True''', (id,))
-    if not specificCountry:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country with id {id} does not exist.")
-    return specificCountry
+    country = await fetch_one(
+        '''
+        SELECT
+            c.name,
+            c.delegate1,
+            c.delegate2,
+            c.delegate3,
+            c.delegate4,
+            c.amendments_submitted,
+            c.speaker_points,
+            c.country_id,
+            c.role,
+            array_agg(cc.council_id) AS councils,
+            MAX(
+                CASE
+                    WHEN co.is_main THEN co.council_id
+                    ELSE NULL
+                END
+            ) AS main_council
+        FROM countries c
+        JOIN country_council cc ON cc.country_id = c.country_id
+        JOIN councils co ON co.council_id = cc.council_id
+        WHERE c.country_id = %s
+        GROUP BY
+            c.name, c.delegate1, c.delegate2, c.delegate3,
+            c.delegate4, c.login, c.amendments_submitted,
+            c.speaker_points, c.country_id, c.role
+        ''',
+        (id,)
+    )
+
+    if not country:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Country with id {id} does not exist."
+        )
+
+    return country
 
 async def get_single_country_service(target_id: int, sender_id: int, role: str) -> dict[str, Any]: 
     if sender_id == target_id or 'admin' == role:
@@ -96,20 +164,20 @@ async def delete_country_service(id: int) -> dict[str, Any]:
 async def unique_login_service() -> str:
     async with get_cursor() as cursor:
         while True:
-            randomNum = str(randrange(100000, 1000000)) #unhashed for now
-            result = await fetch_one('''SELECT exists (SELECT 1 FROM countries WHERE login = %s LIMIT 1);''', (randomNum,), cursor=cursor) or {}
+            random_num = str(randrange(100000, 1000000)) #unhashed for now
+            result = await fetch_one('''SELECT exists (SELECT 1 FROM countries WHERE login = %s LIMIT 1);''', (random_num,), cursor=cursor) or {}
             if not result.get("exists"):
-                return randomNum 
+                return random_num 
 
 async def sheet_export_service() -> None: # need async? 
     url = settings.SPREADSHEET
     response = requests.get(url)
-    csvString = response.text
-    f = io.StringIO(csvString)
-    firstLine = next(f)
-    rawKeys = firstLine.strip().split(",")
-    sanitizedKeys = [sanitize_key(name) for name in rawKeys]
-    reader = csv.DictReader(f, fieldnames=sanitizedKeys)
+    csv_string = response.text
+    f = io.StringIO(csv_string)
+    first_line = next(f)
+    raw_keys = first_line.strip().split(",")
+    sanitized_keys = [sanitize_key(name) for name in raw_keys]
+    reader = csv.DictReader(f, fieldnames=sanitized_keys)
     data = list(reader)
     print(data)
     async with transaction() as cursor:

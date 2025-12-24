@@ -44,5 +44,5 @@ async def delete_resolution(resolution_id: int, current_user=Depends(require_adm
     
 @router.patch('/update-resolution/{resolution_id}',status_code=status.HTTP_200_OK)
 async def update_resolution(resolution_id: int, current_user=Depends(require_admin), council_id: Optional[int] = Form(None), title: Optional[str] = Form(None), clauses: Optional[int] = Form(None), submitter: Optional[int] = Form(None), seconder: Optional[int] = Form(None), negator: Optional[int] = Form(None), res_status: Optional[str] = Form(None), number: Optional[int] = Form(None), file: UploadFile = File(None)) -> dict[str, Any]:
-    result = await update_resolution_service(title, council_id, res_status, clauses, submitter, seconder, negator, number, file)
-    return result
+    result = await update_resolution_service(title, council_id, res_status, clauses, submitter, seconder, negator, number, file, resolution_id)
+    return {"message": "success", **result}

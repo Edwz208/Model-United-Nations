@@ -43,9 +43,19 @@ async def upload_resolution_service(council_id: int, title: str, clauses: int, s
     except ValidationError as e: # auto pydantic handling only done if in direct call to endpoint
         raise HTTPException(status_code=422, detail=e)
     async with transaction() as cursor:
+        # insert .. select means insert rows for number of rows returned by select
         await execute('''UPDATE councils SET resolution_count = resolution_count + 1 WHERE council_id = %s RETURNING *''', (council_id,), cursor=cursor)
-        resolution = await fetch_one('''INSERT INTO resolutions (council_id, title, url, number, clauses, submitter, seconder, negator) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *''', 
-                            (council_id,title,url,clauses,submitter,seconder,negator))
+        resolution = await fetch_one('''INSERT INTO resolutions (council_id, title, url, number, clauses, submitter, seconder, negator)
+            SELECT %s, %s, %s, %s, %s, %s, %s, %s
+            FROM country_council cc1 
+            INNER JOIN country_council cc2 ON cc2.council_id = cc1.council_id
+            INNER JOIN country_council cc3 ON cc3.council_id = cc1.council_id
+            WHERE cc1.country_id = %s
+            AND cc2.country_id = %s
+            AND cc3.country_id = %s
+            AND cc1.council_id = %s
+            RETURNING *;''',
+        (council_id,title,url,clauses,submitter,seconder,negator))
         if not resolution:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -53,7 +63,7 @@ async def upload_resolution_service(council_id: int, title: str, clauses: int, s
             )
         return resolution
 
-async def update_resolution_service(title: str | None, council_id: int | None, res_status: str | None, clauses: int | None, submitter: int | None, seconder: int | None, negator: int | None, number: int | None, file: UploadFile | None) -> dict[str, Any]:
+async def update_resolution_service(title: str | None, council_id: int | None, res_status: str | None, clauses: int | None, submitter: int | None, seconder: int | None, negator: int | None, number: int | None, file: UploadFile | None, resolution_id: int) -> dict[str, Any]:
     try: 
         resolution = ResolutionPatch(title=title, council_id=council_id, clauses=clauses, submitter=submitter, seconder=seconder, negator=negator, number=number, res_status=res_status)
     except ValidationError as e:
@@ -62,17 +72,18 @@ async def update_resolution_service(title: str | None, council_id: int | None, r
         url = file_to_directory(file)
     else:
         url = None
-    result = await fetch_one('''UPDATE resolutions SET 
+        
+    result = await fetch_one('''UPDATE resolutions r SET 
                         title = COALESCE(%s, title),
                         council_id = COALESCE(%s, council_id), 
                         status=COALESCE(%s, status), 
                         clauses= COALESCE(%s, clauses), 
                         submitter = COALESCE(%s, submitter), 
                         seconder = COALESCE(%s, seconder), 
-                        negator = COALESCE(%s, negator), 
+                        negator = COA   LESCE(%s, negator), 
                         url = COALESCE(%s, url),
                         number = COALESCE(%s, number)
-                        WHERE (number) = %s RETURNING *''', (resolution.title,resolution.council_id, resolution.res_status, resolution.clauses, resolution.submitter, resolution.seconder, resolution.negator, url, resolution.number))
+                        FROM country_council cc1 JOIN country_council cc2 ON cc1.council_id = cc2.council_id JOIN country_council cc3 ON cc3.council_id = cc1,council_id WHERE r.council_id = cc1.council_id AND cc1.country_id = COALESCE(%s, r.submitter) AND cc2.country_id = COALESCE(%s, r.seconder) AND cc3.country_id = COALESCE(%s, r.negator) RETURNING *''', (resolution.title,resolution.council_id, resolution.res_status, resolution.clauses, resolution.submitter, resolution.seconder, resolution.negator, url, resolution.number, resolution_id))
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

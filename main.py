@@ -9,17 +9,15 @@ from backend.routers.resolutions import router as resolutions_data_router
 from backend.routers.amendments import router as amendments_data_router
 from backend.routers.councils import router as councils_data_router
 from backend.routers.secretariat import router as secretariat_data_router
+from backend.routers.projection import router as projection_data_router
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
 
 from backend.db.connection import get_async_pool
 from contextlib import asynccontextmanager
 import asyncio  
-from auth.dependencies import get_current_user
-
-import json
 
 async def check_async_connections() -> None:
     while True:
@@ -57,47 +55,4 @@ app.include_router(resolutions_data_router)
 app.include_router(amendments_data_router)
 app.include_router(councils_data_router)
 app.include_router(secretariat_data_router)
-
-
-
-class ConnectionManager:
-    def __init__(self) -> None:
-        self.active_connections: list[WebSocket] = []
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        
-    async def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-        
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-        
-    async def broadcast(self, message: str):
-        disconnected = []
-        for connection in self.active_connections:
-            try:
-                await connection.send_text(message)
-            except Exception as e:
-                disconnected.append(connection)
-        for conn in disconnected:
-            if conn in self.active_connections:
-                self.active_connections.remove(conn)
-    
-manager = ConnectionManager()
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try: 
-        while True:
-            data = await websocket.receive_text()
-            token = json.loads(data).get("accessToken")
-            payload = await get_current_user(token)
-            if payload.get("role") == 'member':
-                message = {"message": data} 
-                await manager.broadcast(json.dumps(message))
-            else:
-                await manager.send_personal_message(json.dumps({"accessToken": False}), websocket)
-                
-    except WebSocketDisconnect:
-        await manager.disconnect(websocket)
+app.include_router(projection_data_router)

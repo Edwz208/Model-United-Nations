@@ -30,7 +30,7 @@ class CountryPatch(BaseModel):
     
 class Resolution(BaseModel):
     title: str
-    council_id: int
+    council_id: Annotated[int, Field(strict=True, ge=0)]
     clauses: Annotated[int, Field(ge=0)]
     submitter: Annotated[int, Field(ge=0)]
     seconder: Annotated[int, Field(ge=0)]
@@ -38,7 +38,7 @@ class Resolution(BaseModel):
 
 class ResolutionPatch(BaseModel):
     title: Optional[str] = None
-    council_id: Optional[int] = None 
+    council_id: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     res_status: Optional[str] = None
     clauses: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     submitter: Annotated[Optional[int], Field(strict=True, ge=0)] = None
@@ -49,18 +49,18 @@ class ResolutionPatch(BaseModel):
 
 class Amendment(BaseModel):
     resolution_id: Annotated[int, Field(strict=True, ge=0)]
-    status: Optional[str] = 'pending review'
+    status: Annotated[str, Field(max_length=50)] = 'pending review' #must be string, remove optional
     clause: Annotated[int, Field(strict=True, ge=0)]
     submitter: Annotated[int, Field(strict=True, ge=0)]
-    content: str
+    content: Annotated[str, Field(max_length=500)]
 
 class AmendmentPatch(BaseModel):
     resolution_id: Annotated[Optional[int], Field(strict=True, ge=0)] = None
-    status: Optional[str] = None
+    status: Annotated[Optional[str], Field(max_length=50)] = None
     clause: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     submitter: Annotated[Optional[int], Field(strict=True, ge=0)] = None
-    content: Optional[str] = None
-
+    content: Annotated[Optional[str], Field(max_length=500)] = None
+    
 class Exec(BaseModel):
     name: str
     position: str
@@ -76,3 +76,18 @@ class Council(BaseModel):
 class CouncilPatch(BaseModel):
     name: Optional[str] = None
     resolution_count: Optional[int] = None
+
+class Projection(BaseModel):
+    active_screen: Optional[str] = None
+    temporary_speaker_1: Annotated[Optional[int], Field(strict=True, ge=0)] = None
+    temporary_speaker_2: Annotated[Optional[int], Field(strict=True, ge=0)] = None
+    temporary_speaker_3: Annotated[Optional[int], Field(strict=True, ge=0)] = None
+    paging_system: Optional[bool] = None
+    message: Annotated[Optional[str], Field(max_length=600)] = None
+    vote_to_open_resolution_number: Annotated[Optional[int], Field(strict=True, ge=0)] = None
+    vote_pass_fail_or_cancel: Optional[str] = None
+    clear_Vote: Optional[bool] = None
+
+class ApproveRejectAmendment(BaseModel):
+    status: str
+    reject_message: Annotated[Optional[str], Field(max_length=100)] = None
