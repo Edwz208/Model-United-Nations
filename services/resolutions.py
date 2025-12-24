@@ -1,8 +1,10 @@
 from db.utils import fetch_all, fetch_one, transaction, execute
-from utils.utils import sanitize_filename
 from typing import Any
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 from pathlib import Path
+from utils.utils import file_to_directory
+from schemas import Resolution, ResolutionPatch
+from pydantic import ValidationError
 
 async def get_all_resolutions_general_info_service() -> list[dict[str, Any]]:
     result = await fetch_all('''SELECT number, title, clauses, council_id, status, amendment_count, resolution_id FROM resolutions''')
@@ -33,3 +35,47 @@ async def delete_resolution_service(resolution_id: int) -> dict[str, Any]:
         await execute('''UPDATE councils SET resolution_count = resolution_count-1 WHERE council_id = %s RETURNING resolution_count''', (result.get('council_id'),), cursor=cursor)
     return result
     
+
+async def upload_resolution_service(council_id: int, title: str, clauses: int, submitter: int, seconder: int, negator:int, file: UploadFile):
+    url = file_to_directory(file)
+    try:
+        resolution_data = Resolution(council_id=council_id,title = title, clauses=clauses, submitter=submitter, seconder=seconder, negator=negator)
+    except ValidationError as e: # auto pydantic handling only done if in direct call to endpoint
+        raise HTTPException(status_code=422, detail=e)
+    async with transaction() as cursor:
+        await execute('''UPDATE councils SET resolution_count = resolution_count + 1 WHERE council_id = %s RETURNING *''', (council_id,), cursor=cursor)
+        resolution = await fetch_one('''INSERT INTO resolutions (council_id, title, url, number, clauses, submitter, seconder, negator) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *''', 
+                            (council_id,title,url,clauses,submitter,seconder,negator))
+        if not resolution:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Resolution was not successfully created",
+            )
+        return resolution
+
+async def update_resolution_service(title: str | None, council_id: int | None, res_status: str | None, clauses: int | None, submitter: int | None, seconder: int | None, negator: int | None, number: int | None, file: UploadFile | None) -> dict[str, Any]:
+    try: 
+        resolution = ResolutionPatch(title=title, council_id=council_id, clauses=clauses, submitter=submitter, seconder=seconder, negator=negator, number=number, res_status=res_status)
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e)
+    if file and file.filename: 
+        url = file_to_directory(file)
+    else:
+        url = None
+    result = await fetch_one('''UPDATE resolutions SET 
+                        title = COALESCE(%s, title),
+                        council_id = COALESCE(%s, council_id), 
+                        status=COALESCE(%s, status), 
+                        clauses= COALESCE(%s, clauses), 
+                        submitter = COALESCE(%s, submitter), 
+                        seconder = COALESCE(%s, seconder), 
+                        negator = COALESCE(%s, negator), 
+                        url = COALESCE(%s, url),
+                        number = COALESCE(%s, number)
+                        WHERE (number) = %s RETURNING *''', (resolution.title,resolution.council_id, resolution.res_status, resolution.clauses, resolution.submitter, resolution.seconder, resolution.negator, url, resolution.number))
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Resolution was not successfully created"
+            )
+    return result

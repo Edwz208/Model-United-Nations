@@ -30,7 +30,7 @@ class CountryPatch(BaseModel):
     
 class Resolution(BaseModel):
     title: str
-    council_id: str
+    council_id: int
     clauses: Annotated[int, Field(ge=0)]
     submitter: Annotated[int, Field(ge=0)]
     seconder: Annotated[int, Field(ge=0)]
@@ -38,12 +38,13 @@ class Resolution(BaseModel):
 
 class ResolutionPatch(BaseModel):
     title: Optional[str] = None
-    council_id: Optional[str] = None 
-    status: Optional[str] = None
+    council_id: Optional[int] = None 
+    res_status: Optional[str] = None
     clauses: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     submitter: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     seconder: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     negator: Annotated[Optional[int], Field(strict=True, ge=0)] = None
+    number: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     url: Optional[str] = None
 
 class Amendment(BaseModel):
