@@ -59,6 +59,7 @@ app.include_router(councils_data_router)
 app.include_router(secretariat_data_router)
 
 
+
 class ConnectionManager:
     def __init__(self) -> None:
         self.active_connections: list[WebSocket] = []

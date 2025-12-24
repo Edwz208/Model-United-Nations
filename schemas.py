@@ -23,6 +23,7 @@ class CountryPatch(BaseModel):
     delegate2: Optional[str] = None
     delegate3: Optional[str] = None
     delegate4: Optional[str] = None # no role here
+    councils: Optional[list[int]] = None
     amendments_submitted: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     speaker_points: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     login: Annotated[Optional[str], Field(strict=True, min_length=4)] = None # use pydantic types for domain rule not api rules, e.g for creating a type

@@ -3,7 +3,7 @@ from schemas import Amendment, AmendmentPatch
 from auth.dependencies import require_member_or_admin, require_specific_member_or_admin
 from db.utils import transaction, get_cursor, fetch_all, fetch_one, execute
 router = APIRouter()
-
+ 
 async def getOwnAmendments(id: int) -> list[dict]:
     ownAmendments = await fetch_all("""SELECT content,clause,resolution_id,submitter,status, modified_at, amendment_id from amendments WHERE (%s) = ANY(submitter)""", (id,))
     return ownAmendments
