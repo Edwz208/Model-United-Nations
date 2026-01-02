@@ -5,18 +5,51 @@ from fastapi import HTTPException, status
 from random import randrange
 from schemas import CountryPatch, Country
 from config import settings
-from backend.utils.utils import sanitize_key
+from utils.utils import sanitize_key
 import requests
 import csv
 import io
 
 async def get_countries_general_service() -> list[dict[str, Any]]:
-    allCountries = await fetch_all('''SELECT name, amendments_submitted, speaker_points, country_id from countries WHERE role = %s ORDER BY name ASC''', ('member',))
-    return allCountries
+    return await fetch_all(
+        '''
+        WITH main AS (
+            SELECT council_id AS main_council
+            FROM councils
+            WHERE is_main = true
+            LIMIT 1
+        )
+        SELECT
+            c.name,
+            c.amendments_submitted,
+            c.speaker_points,
+            c.country_id,
+            c.role,
+            ARRAY(
+                SELECT DISTINCT v
+                FROM unnest(
+                    COALESCE(
+                        array_agg(DISTINCT cc.council_id) FILTER (WHERE cc.council_id IS NOT NULL),
+                        '{}'::int[]
+                    ) || ARRAY[main.main_council]
+                ) AS v
+                ORDER BY v
+            ) AS councils,
+            main.main_council
+        FROM countries c
+        CROSS JOIN main
+        LEFT JOIN country_council cc ON cc.country_id = c.country_id
+        WHERE c.role = %s
+        GROUP BY
+            c.name, c.amendments_submitted, c.speaker_points, c.country_id, c.role, main.main_council
+        ORDER BY c.name ASC
+        ''',
+        ('member',)
+    )
 
-async def get_countries_in_council_service(council_id: int) -> list[dict[str, Any]]:
-    countriesInCouncil = await fetch_all('''SELECT c.name, c.amendments_submitted, c.speaker_points, c.country_id FROM countries AS c JOIN country_council AS cc ON c.country_id = cc.country_id WHERE cc.council_id = %s AND c.role = %s ORDER BY c.name ASC ''', (council_id, 'member'))
-    return countriesInCouncil
+# async def get_countries_in_council_service(council_id: int) -> list[dict[str, Any]]:
+#     countriesInCouncil = await fetch_all('''SELECT c.name, c.amendments_submitted, c.speaker_points, c.country_id FROM countries AS c JOIN country_council AS cc ON c.country_id = cc.country_id WHERE cc.council_id = %s AND c.role = %s ORDER BY c.name ASC ''', (council_id, 'member'))
+#     return countriesInCouncil
         
 async def personal_profile_service(id: int) -> dict[str, Any]:
     country = await fetch_one(
@@ -153,9 +186,8 @@ async def update_country_service(country: CountryPatch, country_id: int) -> dict
         await execute('''WITH delete_prev AS (DELETE FROM country_council WHERE country_id = %s AND council_id NOT IN (SELECT council_id FROM councils WHERE is_main = TRUE)) INSERT INTO country_council (country_id, council_id) SELECT %s, unnest(%s::int[])''',(country_id, country_id, country.councils,),cursor=cursor)
         return result
 
-async def delete_country_service(id: int) -> dict[str, Any]:
-
-    result = await fetch_one('''DELETE FROM countries WHERE country_id = %s AND role != 'admin' RETURNING name, delegate1, delegate2, delegate3, delegate4, login, amendments_submitted, speaker_points, country_id''', (id,))
+async def delete_country_service(ids: list[int]) -> list[dict[str, Any]]:
+    result = await fetch_all('''DELETE FROM countries WHERE role != 'admin' AND country_id = ANY(%s) RETURNING name, delegate1, delegate2, delegate3, delegate4, login, amendments_submitted, speaker_points, country_id''', (ids,))
     # cascades to country_council
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country not found")

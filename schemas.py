@@ -28,6 +28,9 @@ class CountryPatch(BaseModel):
     speaker_points: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     login: Annotated[Optional[str], Field(strict=True, min_length=4)] = None # use pydantic types for domain rule not api rules, e.g for creating a type
     
+class SelectCountriesToDelete(BaseModel):
+    countries: list[int]
+
 class Resolution(BaseModel):
     title: str
     council_id: Annotated[int, Field(strict=True, ge=0)]
@@ -86,8 +89,8 @@ class Projection(BaseModel):
     message: Annotated[Optional[str], Field(max_length=600)] = None
     vote_to_open_resolution_number: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     vote_pass_fail_or_cancel: Optional[str] = None
-    clear_Vote: Optional[bool] = None
-
+    clear_vote: Optional[bool] = None
+# default has on extra ignore not extra forbid
 class ApproveRejectAmendment(BaseModel):
     status: str
     reject_message: Annotated[Optional[str], Field(max_length=100)] = None

@@ -51,7 +51,7 @@ async def approve_reject_amendment_service(amendment_id: int, amendment_status: 
     return result
 
 async def update_amendment_service(amendment_id: int, resolution_id: int | None, amendment_status: str | None, clause: int | None, submitter: int | None, content: str | None) -> dict[str, Any]:
-    result = await fetch_one('''UPDATE amendments SET resolution_id = COALESCE(%s, resolution_id), status = COALESCE(%s, status), clause = COALESCE(%s, clause), submitter = COALESCE(%s, submitter), content = COALESCE(%s, content) WHERE amendment_id = %s RETURNING *''', (resolution_id, amendment_status, clause, submitter, content, amendment_id))
+    result = await fetch_one('''UPDATE amendments SET resolution_id = COALESCE(%s, resolution_id), status = COALESCE(%s, status), clause = COALESCE(%s, clause), submitter = COALESCE(%s, submitter), content = COALESCE(%s, content) FROM resolutions r JOIN country_council cc on cc.council_id = r.council_id WHERE resolution_id = %s AND cc.country_id = COALESCE(%s, submitter) AND amendment_id = %s RETURNING *''', (resolution_id, amendment_status, clause, submitter, content, resolution_id, submitter, amendment_id))
     if not result:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

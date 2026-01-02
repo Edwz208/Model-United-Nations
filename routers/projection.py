@@ -12,6 +12,7 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        print(f"New connection. Total connections: {len(self.active_connections)}")
         
     async def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
@@ -33,12 +34,13 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 @router.post('/projection/{council_id}', status_code=status.HTTP_200_OK)
-async def update_screen(council_id: int, projection: Projection, current_user = Depends(require_admin)) -> dict[str, Any]:
+async def update_screen(council_id: int, projection: Projection) -> dict[str, Any]:
     projection_dict = projection.model_dump(exclude_unset=True)
+    print(projection_dict)
     await manager.broadcast(json.dumps(projection_dict))
-    return {"message": "success", **projection_dict}
+    return {"message": "success", "projection": projection_dict}
 
-@router.websocket("/ws")
+@router.websocket("/screen")
 async def screen_connection(websocket: WebSocket):
     await manager.connect(websocket)
     try: 

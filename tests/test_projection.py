@@ -14,5 +14,5 @@ def test_screen_connection():
         response2 = client2.post('/projection/18', json={"active_screen": "conference"})
         data = websocket.receive_json() # no need to await, the testclient handles already event loop
         # receive_json simply outputs latest message 
-    
+    #If a WebSocket connection is open at the moment the server sends a message, that message is buffered and will be delivered when the client reads next.
     assert data == {"active_screen": "conference"}

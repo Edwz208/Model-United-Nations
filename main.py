@@ -4,18 +4,18 @@
 # load_dotenv(dotenv_path)
 
 from routers.login import router as login_router
-from backend.routers.countries import router as countries_data_router
-from backend.routers.resolutions import router as resolutions_data_router
-from backend.routers.amendments import router as amendments_data_router
-from backend.routers.councils import router as councils_data_router
-from backend.routers.secretariat import router as secretariat_data_router
-from backend.routers.projection import router as projection_data_router
+from routers.countries import router as countries_data_router
+from routers.resolutions import router as resolutions_data_router
+from routers.amendments import router as amendments_data_router
+from routers.councils import router as councils_data_router
+from routers.secretariat import router as secretariat_data_router
+from routers.projection import router as projection_data_router
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI
 
-from backend.db.connection import get_async_pool
+from db.connection import get_async_pool
 from contextlib import asynccontextmanager
 import asyncio  
 

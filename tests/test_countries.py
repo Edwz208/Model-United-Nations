@@ -1,16 +1,8 @@
-# from services.countries import get_countries_general_service
-# import sys
-# import asyncio
+from services.countries import get_countries_general_service
+import pytest
 
-# if sys.platform.startswith("win"):
-#     from asyncio import WindowsSelectorEventLoopPolicy
-#     asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
-
-
-# async def main():
-#     result = await get_countries_general_service()
-#     print(result)
-
-# if __name__ == "__main__":
-#     asyncio.run(main())
-#  #python -m tests.test_countries to run backend as import root
+@pytest.mark.asyncio
+async def test_get_countries_general_service():
+    result = await get_countries_general_service()
+    print(result)
+    assert result == []

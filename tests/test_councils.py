@@ -1,15 +1,10 @@
 import pytest
 from services.councils import get_all_councils_service
 from db.connection import AsyncConnectionPool
-import asyncio
-import sys
 from config import settings
 #pytest -s to show print
-if sys.platform.startswith("win"):
-    # Use a selector event loop for psycopg async
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio #useful for if you need to run service functions or non routes that require async
 async def test_get_all_council_service():
     async with AsyncConnectionPool(conninfo=settings.DATABASE_URL,
         configure=lambda conn: conn.set_autocommit(True),

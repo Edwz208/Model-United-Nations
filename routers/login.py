@@ -7,7 +7,7 @@ router = APIRouter()
 @router.post("/login", status_code=status.HTTP_202_ACCEPTED)
 async def login(user: User, response: Response) -> dict[str, Any]:
     returned_info = await login_service(user.country, user.code, response)
-    return {"message": "success", **returned_info} 
+    return returned_info
 
 @router.post("/logout")
 def logout(response: Response) -> dict[str, Any]:

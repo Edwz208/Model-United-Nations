@@ -34,15 +34,15 @@ async def uploading_resolution(#put non default arguments before default argumen
     # missing status, amendment_count
 ) -> dict[str, Any]:
     resolution = await upload_resolution_service(council_id, title, clauses, submitter, seconder, negator, file)
-    return {"message": "success", **resolution}
+    return {"message": "success", "resolution": resolution}
     
 
 @router.delete('/delete-resolution/{resolution_id}', status_code=status.HTTP_200_OK)
 async def delete_resolution(resolution_id: int, current_user=Depends(require_admin)) -> dict[str, Any]:
     result = await delete_resolution_service(resolution_id)   
-    return {"message":"success", **result}
+    return {"message":"success", "resolution": result}
     
 @router.patch('/update-resolution/{resolution_id}',status_code=status.HTTP_200_OK)
 async def update_resolution(resolution_id: int, current_user=Depends(require_admin), council_id: Optional[int] = Form(None), title: Optional[str] = Form(None), clauses: Optional[int] = Form(None), submitter: Optional[int] = Form(None), seconder: Optional[int] = Form(None), negator: Optional[int] = Form(None), res_status: Optional[str] = Form(None), number: Optional[int] = Form(None), file: UploadFile = File(None)) -> dict[str, Any]:
     result = await update_resolution_service(title, council_id, res_status, clauses, submitter, seconder, negator, number, file, resolution_id)
-    return {"message": "success", **result}
+    return {"message": "success", "resolution": result}

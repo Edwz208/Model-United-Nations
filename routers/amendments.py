@@ -28,9 +28,9 @@ async def update_amendment(amendment_id: int, country_id: int, amendment: Amendm
 @router.delete('/delete-amendment/{amendment_id}', status_code=status.HTTP_200_OK)
 async def delete_amendment(amendment_id: int, current_user=Depends(require_member_or_admin)) -> dict[str, Any]:
     result = await delete_amendment_service(amendment_id)
-    return {"message": "success", **result}
+    return {"message": "success", "amendment": result}
 
 @router.post('/approve-reject-amendment/{amendment_id}', status_code=status.HTTP_200_OK)
 async def approve_reject_amendment(amendment_id: int, approve_reject: ApproveRejectAmendment, current_user=Depends(require_admin)) -> dict[str, Any]:
     result = await approve_reject_amendment_service(amendment_id, approve_reject.status, approve_reject.reject_message)
-    return {"message": "success", **result}
+    return {"message": "success", "amendment": result}
