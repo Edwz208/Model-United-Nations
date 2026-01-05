@@ -42,7 +42,7 @@ async def get_countries_general_service() -> list[dict[str, Any]]:
         WHERE c.role = %s
         GROUP BY
             c.name, c.amendments_submitted, c.speaker_points, c.country_id, c.role, main.main_council
-        ORDER BY c.name ASC
+        ORDER BY LOWER(c.name) ASC
         ''',
         ('member',)
     )

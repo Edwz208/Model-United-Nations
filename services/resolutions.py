@@ -7,7 +7,7 @@ from schemas import Resolution, ResolutionPatch
 from pydantic import ValidationError
 
 async def get_all_resolutions_general_info_service() -> list[dict[str, Any]]:
-    result = await fetch_all('''SELECT number, title, clauses, council_id, status, amendment_count, resolution_id FROM resolutions''')
+    result = await fetch_all('''SELECT number, title, clauses, council_id, status, amendment_count, resolution_id FROM resolutions ORDER BY LOWER(title) ASC''')
     return result
 
 async def get_all_council_resolutions_general_info_service(council_id: int) -> list[dict[str, Any]]:
@@ -20,19 +20,27 @@ async def get_specific_resolution_service(resolution_id: int) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resolution not found")
     return resolution
 
-async def delete_resolution_service(resolution_id: int) -> dict[str, Any]:
+async def delete_resolution_service(resolution_ids: list[int]) -> list[dict[str, Any]]:
     async with transaction() as cursor:
-        url = await fetch_one('''SELECT url FROM resolutions WHERE resolution_id=%s''', (resolution_id,), cursor=cursor)
-        if url and url.get("url"):
-            file = Path(f'./uploads/resolutions/{url.get("url")}')
-            file.unlink()
-        result = await fetch_one('''DELETE FROM resolutions WHERE resolution_id=%s RETURNING *''' , (resolution_id,), cursor=cursor)
+        result = await fetch_all('''DELETE FROM resolutions WHERE resolution_id=%s RETURNING *''' , (resolution_ids,), cursor=cursor)
+        councils_deleted_from_counter = {}
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Resolution {resolution_id} was not found",
+                detail=f"Resolutions {resolution_ids} were not found",
             )
-        await execute('''UPDATE councils SET resolution_count = resolution_count-1 WHERE council_id = %s RETURNING resolution_count''', (result.get('council_id'),), cursor=cursor)
+        for row in result:
+            if row.get("url"):
+                file = Path(f'./uploads/resolutions/{row.get("url")}')
+                if file.exists():
+                    file.unlink()
+            if row["council_id"] not in councils_deleted_from_counter:
+                councils_deleted_from_counter[row["council_id"]] = 1
+            else: 
+                councils_deleted_from_counter[row["council_id"]] +=1    
+
+        for council_id in councils_deleted_from_counter:
+                await execute('''UPDATE councils SET resolution_count = resolution_count-1 WHERE council_id = %s RETURNING resolution_count''', (councils_deleted_from_counter[council_id],), cursor=cursor)
     return result
     
 

@@ -3,15 +3,15 @@ from typing import Any
 from fastapi import HTTPException, status
 
 async def get_own_amendments_service(id: int) -> list[dict[str, Any]]:
-    result = await fetch_all('''SELECT content,clause,resolution_id,submitter,status, modified_at, amendment_id FROM amendments WHERE (%s) = ANY(submitter)''', (id,))
+    result = await fetch_all('''SELECT content,clause,resolution_id,submitter,status, modified_at, amendment_id FROM amendments WHERE (%s) = ANY(submitter) ORDER BY modified_at ASC''', (id,))
     return result
         
 async def get_recent_amendments() -> list[dict[str, Any]]:
-    result = await fetch_all('''SELECT content, clause, resolution_id, submitter, status, modified_at, amendment_id FROm amendments ORDER BY modified_at DESC LIMIT 3''')
+    result = await fetch_all('''SELECT content, clause, resolution_id, submitter, status, modified_at, amendment_id FROM amendments ORDER BY modified_at DESC LIMIT 3''')
     return result
 
 async def get_all_amendments_for_resolution_service(resolution_id: int) -> list[dict[str, Any]]:
-    result = await fetch_all('''SELECT content,clause,resolution_id,submitter,status, modified_at, amendment_id FROM amendments WHERE resolution_id = %s''', (resolution_id,))
+    result = await fetch_all('''SELECT content,clause,resolution_id,submitter,status, modified_at, amendment_id FROM amendments WHERE resolution_id = %s ORDER BY modified_at ASC''', (resolution_id,))
     return result
 
 async def upload_amendment_service(content: str, clause: int, resolution_id: int, submitter: int, amendment_status: str) -> dict[str, Any]:

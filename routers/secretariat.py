@@ -13,7 +13,7 @@ async def set_exec(person: Exec, current_user=Depends(require_admin)) -> dict[st
         
 @router.get("/get-secretariat", status_code = status.HTTP_200_OK)
 async def get_all_execs() -> list[dict[str, Any]]:
-    allExecs = await fetch_all('''SELECT name, position, secretariat_id from secretariat''')
+    allExecs = await fetch_all('''SELECT name, position, secretariat_id from secretariat ORDER BY secretariat_id ASC''')
     return allExecs
         
 @router.delete('/delete-secretariat/{secretariat_id}', status_code = status.HTTP_200_OK)

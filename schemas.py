@@ -50,6 +50,9 @@ class ResolutionPatch(BaseModel):
     number: Annotated[Optional[int], Field(strict=True, ge=0)] = None
     url: Optional[str] = None
 
+class SelectResolutionsToDelete(BaseModel):
+    resolution_ids: list[int]
+
 class Amendment(BaseModel):
     resolution_id: Annotated[int, Field(strict=True, ge=0)]
     status: Annotated[str, Field(max_length=50)] = 'pending review' #must be string, remove optional

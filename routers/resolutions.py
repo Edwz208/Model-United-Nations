@@ -2,6 +2,7 @@ from fastapi import APIRouter, status, UploadFile, File, Form, Depends
 from services.resolutions import update_resolution_service, upload_resolution_service, get_all_resolutions_general_info_service, get_all_council_resolutions_general_info_service, get_specific_resolution_service, delete_resolution_service
 from auth.dependencies import require_admin, require_member_or_admin
 from typing import Any, Optional
+from schemas import SelectResolutionsToDelete
 
 # For resolutions, we allow admin to change the order of resolutions, change the order of multiple at once after saving to make it one call to the server
 router = APIRouter()
@@ -37,9 +38,9 @@ async def uploading_resolution(#put non default arguments before default argumen
     return {"message": "success", "resolution": resolution}
     
 
-@router.delete('/delete-resolution/{resolution_id}', status_code=status.HTTP_200_OK)
-async def delete_resolution(resolution_id: int, current_user=Depends(require_admin)) -> dict[str, Any]:
-    result = await delete_resolution_service(resolution_id)   
+@router.delete('/delete-resolutiona', status_code=status.HTTP_200_OK)
+async def delete_resolution(resolutions: SelectResolutionsToDelete, current_user=Depends(require_admin)) -> dict[str, Any]:
+    result = await delete_resolution_service(resolutions.resolution_ids)   
     return {"message":"success", "resolution": result}
     
 @router.patch('/update-resolution/{resolution_id}',status_code=status.HTTP_200_OK)
