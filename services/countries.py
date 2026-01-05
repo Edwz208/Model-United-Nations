@@ -235,4 +235,10 @@ async def sheet_export_service() -> None: # need async?
                     row.get("role"),
                 ), cursor=cursor
             )
-        
+
+async def update_speaker_points_service(country: int, speaker_points: int) -> dict[str, Any]:
+    print('hi')
+    result = await fetch_one('''UPDATE countries SET speaker_points = speaker_points + %s WHERE country_id = %s RETURNING *''',(speaker_points, country,))
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country not found")
+    return result

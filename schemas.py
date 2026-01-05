@@ -31,6 +31,10 @@ class CountryPatch(BaseModel):
 class SelectCountriesToDelete(BaseModel):
     countries: list[int]
 
+class UpdateSpeakerPoints(BaseModel):
+    country: int
+    speaker_points: int
+
 class Resolution(BaseModel):
     title: str
     council_id: Annotated[int, Field(strict=True, ge=0)]
