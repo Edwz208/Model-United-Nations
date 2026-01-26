@@ -33,16 +33,20 @@ class ConnectionManager:
     
 manager = ConnectionManager()
 
-@router.post('/projection/{council_id}', status_code=status.HTTP_200_OK)
+@router.post('/projection/{council_id}', status_code=status.HTTP_200_OK) # add auth require_admin later
 async def update_screen(council_id: int, projection: Projection) -> dict[str, Any]:
     projection_dict = projection.model_dump(exclude_unset=True)
     print(projection_dict)
     await manager.broadcast(json.dumps(projection_dict))
     return {"message": "success", "projection": projection_dict}
 
-@router.websocket("/screen")
-async def screen_connection(websocket: WebSocket):
-    await manager.connect(websocket)
+@router.websocket("/Council/{council_id}/Screen")
+async def screen_connection(council_id: int, websocket: WebSocket):
+    try: 
+        await manager.connect(websocket)
+    except Exception: 
+        return
+    
     try: 
         while True:
             data = await websocket.receive_text() # needed to handle disconnects            

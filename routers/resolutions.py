@@ -26,6 +26,7 @@ async def specific_resolution(resolution_id: int, current_user=Depends(require_m
 async def uploading_resolution(#put non default arguments before default arguments Depends is non deafult
     council_id: int = Form(...),
     title: str = Form(...),
+    number: int = Form(...),
     clauses: int = Form(...),
     submitter: int = Form(...),
     seconder: int = Form(...),
@@ -34,7 +35,9 @@ async def uploading_resolution(#put non default arguments before default argumen
     current_user = Depends(require_admin)
     # missing status, amendment_count
 ) -> dict[str, Any]:
-    resolution = await upload_resolution_service(council_id, title, clauses, submitter, seconder, negator, file)
+    print('hi')
+    print("UPLOAD council_id received:", council_id)
+    resolution = await upload_resolution_service(council_id, title, number, clauses, submitter, seconder, negator, file)
     return {"message": "success", "resolution": resolution}
     
 

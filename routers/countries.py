@@ -1,22 +1,26 @@
 from fastapi import APIRouter, status, Depends
-from schemas import Country, CountryPatch, SelectCountriesToDelete, UpdateSpeakerPoints
+from schemas import Country, CountryPatch, SelectCountriesToDelete, UpdateSpeakerPoints, ImportCountriesFromSpreadsheet
 from auth.dependencies import require_admin, require_member_or_admin
 from typing import Any
 from services.countries import update_speaker_points_service, get_countries_general_service, get_single_country_service, delete_country_service, update_country_service, sheet_export_service, add_country_service
-
+# type annotate for fastapi to know model coming from request body
 router = APIRouter()
-@router.get("/sheet-export",status_code = status.HTTP_200_OK)
-async def sheet_xport(current_user = Depends(require_admin)) -> dict[str, Any]:
-    await sheet_export_service()
+@router.post("/sheet-export",status_code = status.HTTP_200_OK)
+async def sheet_xport(spreadsheet_url: ImportCountriesFromSpreadsheet, current_user = Depends(require_admin)) -> dict[str, Any]:
+    print(spreadsheet_url)
+    await sheet_export_service(spreadsheet_url.url)
     return {"message": "success"} # dont resend data
 
 @router.patch('/update-single-country/{country_id}',status_code = status.HTTP_200_OK)
 async def update_country(country_id: int, country: CountryPatch, current_user=Depends(require_admin)) -> dict[str, Any]:
+    print('hi')
+    print(country)
     result = await update_country_service(country, country_id)
+    print(country)
     return {"message": "success", "country": result}
 
 @router.post('/add-single-country', status_code=status.HTTP_200_OK)
-async def add_one_country(country: Country, current_user=Depends(require_admin)):
+async def add_one_country(country: Country):
     result = await add_country_service(country)
     return {"message": "success", "country": result}
 

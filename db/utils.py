@@ -2,7 +2,12 @@ from fastapi import HTTPException, status
 from psycopg.errors import (
     UniqueViolation,
     ForeignKeyViolation,
-    CheckViolation
+    CheckViolation,
+    NotNullViolation,
+    InvalidTextRepresentation,
+    DatatypeMismatch,
+    UndefinedColumn,
+    UndefinedTable,
 )
 from psycopg.rows import dict_row
 from contextlib import asynccontextmanager
@@ -18,26 +23,24 @@ async def get_pool():
     return _pool
 
 def handle_db_error(e: Exception):
-    if isinstance(e, UniqueViolation):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unique constraint violation."
-        )
-    if isinstance(e, ForeignKeyViolation):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid reference (foreign key violation)."
-        )
-    if isinstance(e, CheckViolation):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Value violates a CHECK constraint."
-        )
+    print("DB ERROR TYPE:", type(e))
+    print("DB ERROR REPR:", repr(e))
 
-    raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Database error."
-    )       
+    if isinstance(e, UniqueViolation):
+        raise HTTPException(status_code=409, detail="Unique constraint violation.")
+    if isinstance(e, ForeignKeyViolation):
+        raise HTTPException(status_code=422, detail="Invalid reference (foreign key violation).")
+    if isinstance(e, CheckViolation):
+        raise HTTPException(status_code=422, detail="Value violates a CHECK constraint.")
+    if isinstance(e, NotNullViolation):
+        raise HTTPException(status_code=422, detail="Missing required field (NOT NULL).")
+    if isinstance(e, (InvalidTextRepresentation, DatatypeMismatch)):
+        raise HTTPException(status_code=422, detail="Invalid data type.")
+    if isinstance(e, (UndefinedColumn, UndefinedTable)):
+        raise HTTPException(status_code=500, detail="Database schema mismatch.")
+
+    raise HTTPException(status_code=500, detail=f"Database error: {type(e).__name__}")
+
 
 @asynccontextmanager
 async def get_cursor():

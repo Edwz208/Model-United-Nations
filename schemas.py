@@ -31,6 +31,9 @@ class CountryPatch(BaseModel):
 class SelectCountriesToDelete(BaseModel):
     countries: list[int]
 
+class ImportCountriesFromSpreadsheet(BaseModel):
+    url: str 
+
 class UpdateSpeakerPoints(BaseModel):
     country: int
     speaker_points: int
@@ -42,6 +45,7 @@ class Resolution(BaseModel):
     submitter: Annotated[int, Field(ge=0)]
     seconder: Annotated[int, Field(ge=0)]
     negator: Annotated[int, Field(ge=0)]
+    number: Annotated[int, Field(ge=0)]
 
 class ResolutionPatch(BaseModel):
     title: Optional[str] = None
@@ -101,3 +105,4 @@ class Projection(BaseModel):
 class ApproveRejectAmendment(BaseModel):
     status: str
     reject_message: Annotated[Optional[str], Field(max_length=100)] = None
+

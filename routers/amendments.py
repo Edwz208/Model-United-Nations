@@ -2,7 +2,7 @@ from fastapi import APIRouter, status, Depends
 from auth.dependencies import require_member_or_admin, require_specific_member_or_admin, require_admin
 from schemas import Amendment, AmendmentPatch, ApproveRejectAmendment
 from typing import Any
-from services.amendments import get_own_amendments_service, get_all_amendments_for_resolution_service, approve_reject_amendment_service, update_amendment_service, delete_amendment_service, upload_amendment_service
+from services.amendments import get_all_amendments_for_council_service, get_own_amendments_service, get_all_amendments_for_resolution_service, approve_reject_amendment_service, update_amendment_service, delete_amendment_service, upload_amendment_service
 router = APIRouter()
         
 @router.get('/specific-amendment-country/{country_id}', status_code=status.HTTP_200_OK)
@@ -14,6 +14,12 @@ async def specific_country_amendments(country_id: int, current_user=Depends(requ
 async def all_amendments_for_resolution(resolution_id: int, current_user=Depends(require_member_or_admin)) -> list[dict[str, Any]]:
     result = await get_all_amendments_for_resolution_service(resolution_id)
     return result
+
+@router.get('/council-amendments/{council_id}', status_code=status.HTTP_200_OK)
+async def all_amendments_for_council(council_id: int, current_user=Depends(require_member_or_admin)) -> list[dict[str, Any]]:
+    result = await get_all_amendments_for_council_service(council_id)
+    return result
+
 
 @router.post('/upload-amendment',status_code = status.HTTP_200_OK)
 async def uploading_amendment(amendment: Amendment, current_user=Depends(require_member_or_admin)):
@@ -30,7 +36,8 @@ async def delete_amendment(amendment_id: int, current_user=Depends(require_membe
     result = await delete_amendment_service(amendment_id)
     return {"message": "success", "amendment": result}
 
-@router.post('/approve-reject-amendment/{amendment_id}', status_code=status.HTTP_200_OK)
+@router.patch('/approve-reject-amendment/{amendment_id}', status_code=status.HTTP_200_OK)
 async def approve_reject_amendment(amendment_id: int, approve_reject: ApproveRejectAmendment, current_user=Depends(require_admin)) -> dict[str, Any]:
+    print(approve_reject)
     result = await approve_reject_amendment_service(amendment_id, approve_reject.status, approve_reject.reject_message)
     return {"message": "success", "amendment": result}

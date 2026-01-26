@@ -65,16 +65,14 @@ async def personal_profile_service(id: int) -> dict[str, Any]:
             c.speaker_points,
             c.country_id,
             c.role,
-            array_agg(cc.council_id) AS councils,
-            MAX(
-                CASE
-                    WHEN co.is_main THEN co.council_id
-                    ELSE NULL
-                END
-            ) AS main_council
+            COALESCE(
+                array_remove(array_agg(DISTINCT cc.council_id), NULL),
+                '{}'::int[]
+            ) AS councils,
+            MAX(CASE WHEN co.is_main THEN co.council_id END) AS main_council
         FROM countries c
-        JOIN country_council cc ON cc.country_id = c.country_id
-        JOIN councils co ON co.council_id = cc.council_id
+        LEFT JOIN country_council cc ON cc.country_id = c.country_id
+        LEFT JOIN councils co ON co.council_id = cc.council_id
         WHERE c.country_id = %s
         GROUP BY
             c.name, c.delegate1, c.delegate2, c.delegate3,
@@ -134,6 +132,7 @@ async def specific_profile_service(id: int) -> dict[str, Any]:
 
 async def get_single_country_service(target_id: int, sender_id: int, role: str) -> dict[str, Any]: 
     if sender_id == target_id or 'admin' == role:
+        print(target_id)
         result = await personal_profile_service(target_id)
     else:
         result = await specific_profile_service(target_id)
@@ -145,7 +144,41 @@ async def get_single_country_service(target_id: int, sender_id: int, role: str) 
     return result
 
 async def add_country_service(country: Country) -> dict[str, Any]:
-    result = await fetch_one("""WITH new_country AS (INSERT INTO countries (name, delegate1, delegate2, delegate3, delegate4, role, login, amendments_submitted, speaker_points) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING country_id) INSERT INTO country_council (country_id, council_id) SELECT new_country.country_id, cid FROM new_country, unnest(%s::int[]) as cid ON CONFLICT DO NOTHING RETURNING name, delegate1, delegate2, delegate3, delegate4, role, login, amendments_submitted, speaker_point, country_id""", (country.assigned_country, country.delegate1, country.delegate2, country.delegate3, country.delegate4, country.role, country.login, country.amendments_submitted, country.speaker_points, country.councils))
+    
+    query = '''
+WITH new_country AS (
+  INSERT INTO countries (
+    name, delegate1, delegate2, delegate3, delegate4,
+    role, login, amendments_submitted, speaker_points
+  )
+  VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+  RETURNING
+    name, delegate1, delegate2, delegate3, delegate4,
+    role, login, amendments_submitted, speaker_points, country_id
+),
+links AS (
+  INSERT INTO country_council (country_id, council_id)
+  SELECT new_country.country_id, cid
+  FROM new_country
+  CROSS JOIN unnest(COALESCE(%s::int[], ARRAY[]::int[])) AS cid
+  ON CONFLICT DO NOTHING
+)
+SELECT * FROM new_country;'''
+
+
+    params = (
+        country.assigned_country,
+        country.delegate1,
+        country.delegate2,
+        country.delegate3,
+        country.delegate4,
+        country.role,
+        country.login,
+        country.amendments_submitted or 0,
+        country.speaker_points or 0,
+        country.councils,
+    )
+    result = await fetch_one(query, params)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -154,20 +187,24 @@ async def add_country_service(country: Country) -> dict[str, Any]:
     return result
 
 async def update_country_service(country: CountryPatch, country_id: int) -> dict[str, Any]:
-    query = '''
-        UPDATE countries
-        SET
-        name = COALESCE(%s, name),
-        delegate1 = COALESCE(%s, delegate1),
-        delegate2 = COALESCE(%s, delegate2),
-        delegate3 = COALESCE(%s, delegate3),
-        delegate4 = COALESCE(%s, delegate4),
-        login = COALESCE(%s, login),
-        amendments_submitted = COALESCE(%s, amendments_submitted),
-        speaker_points = COALESCE(%s, speaker_points)
-        WHERE country_id = %s
-        RETURNING name, delegate1, delegate2, delegate3, delegate4, login, amendments_submitted, speaker_points, country_id;
-        '''
+    print(country)
+    update_query = '''
+    UPDATE countries
+    SET
+      name = COALESCE(%s, name),
+      delegate1 = COALESCE(%s, delegate1),
+      delegate2 = COALESCE(%s, delegate2),
+      delegate3 = COALESCE(%s, delegate3),
+      delegate4 = COALESCE(%s, delegate4),
+      login = COALESCE(%s, login),
+      amendments_submitted = COALESCE(%s, amendments_submitted),
+      speaker_points = COALESCE(%s, speaker_points)
+    WHERE country_id = %s
+    RETURNING
+      name, delegate1, delegate2, delegate3, delegate4,
+      login, amendments_submitted, speaker_points, country_id;
+    '''
+
     params = (
         country.assigned_country,
         country.delegate1,
@@ -179,11 +216,32 @@ async def update_country_service(country: CountryPatch, country_id: int) -> dict
         country.speaker_points,
         country_id,
     )
+
     async with transaction() as cursor:
-        result = await fetch_one(query, params, cursor=cursor)
-        if not result: 
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country not found")
-        await execute('''WITH delete_prev AS (DELETE FROM country_council WHERE country_id = %s AND council_id NOT IN (SELECT council_id FROM councils WHERE is_main = TRUE)) INSERT INTO country_council (country_id, council_id) SELECT %s, unnest(%s::int[])''',(country_id, country_id, country.councils,),cursor=cursor)
+        result = await fetch_one(update_query, params, cursor=cursor)
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Country not found",
+            )
+
+        await execute(
+            '''DELETE FROM country_council WHERE country_id = %s AND council_id NOT IN (SELECT council_id FROM councils WHERE is_main = TRUE);''',
+            (country_id,),
+            cursor=cursor,
+        )
+
+        await execute(
+            '''
+            INSERT INTO country_council (country_id, council_id)
+            SELECT %s, cid
+            FROM unnest(%s::int[]) AS cid
+            ON CONFLICT DO NOTHING;
+            ''',
+            (country_id, country.councils),
+            cursor=cursor,
+        )
+
         return result
 
 async def delete_country_service(ids: list[int]) -> list[dict[str, Any]]:
@@ -201,9 +259,12 @@ async def unique_login_service() -> str:
             if not result.get("exists"):
                 return random_num 
 
-async def sheet_export_service() -> None: # need async? 
-    url = settings.SPREADSHEET
-    response = requests.get(url)
+async def sheet_export_service(url) -> None: # need async? 
+    try:
+        response = requests.get(url)
+    except Exception as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid url")
+
     csv_string = response.text
     f = io.StringIO(csv_string)
     first_line = next(f)
@@ -213,17 +274,23 @@ async def sheet_export_service() -> None: # need async?
     data = list(reader)
     print(data)
     async with transaction() as cursor:
-        for row in data:
+        for row in data:    
+            country = row.get("assigned_country", "").strip()
+            if not country and not any((v or "").strip() for v in row.values()):
+                continue
+            if country.lower() == "schools":
+                break
             row.pop("school", None)
             row["role"] = 'member'
             await execute(
-                '''INSERT INTO countries (name, delegate1, delegate2, delegate3, delegate4, login, role) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (name) DO UPDATE
+                '''INSERT INTO countries (name, delegate1, delegate2, delegate3, delegate4, login, speaker_points, role) VALUES (%s,%s,%s,%s,%s,%s,%s, %s) ON CONFLICT (name) DO UPDATE
                 SET delegate1 = EXCLUDED.delegate1,
                 delegate2 = EXCLUDED.delegate2,
                 delegate3 = EXCLUDED.delegate3,
                 delegate4 = EXCLUDED.delegate4,
                 login = CASE WHEN countries.login IS NULL OR countries.login = '' THEN EXCLUDED.login
                 ELSE countries.login END,
+                speaker_points = EXCLUDED.speaker_points,
                 role = EXCLUDED.role;''',
                 (
                     row.get("assigned_country"),
@@ -232,12 +299,12 @@ async def sheet_export_service() -> None: # need async?
                     row.get("delegate_3"),
                     row.get("delegate_4"),
                     await unique_login_service(),
+                    0,
                     row.get("role"),
                 ), cursor=cursor
             )
 
 async def update_speaker_points_service(country: int, speaker_points: int) -> dict[str, Any]:
-    print('hi')
     result = await fetch_one('''UPDATE countries SET speaker_points = speaker_points + %s WHERE country_id = %s RETURNING *''',(speaker_points, country,))
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Country not found")

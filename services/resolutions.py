@@ -43,33 +43,88 @@ async def delete_resolution_service(resolution_ids: list[int]) -> list[dict[str,
                 await execute('''UPDATE councils SET resolution_count = resolution_count-1 WHERE council_id = %s RETURNING resolution_count''', (councils_deleted_from_counter[council_id],), cursor=cursor)
     return result
     
-
-async def upload_resolution_service(council_id: int, title: str, clauses: int, submitter: int, seconder: int, negator:int, file: UploadFile):
+async def upload_resolution_service(
+    council_id: int,
+    title: str,
+    number: int,
+    clauses: int,
+    submitter: int,
+    seconder: int,
+    negator: int,
+    file: UploadFile
+):
     url = file_to_directory(file)
+
     try:
-        resolution_data = Resolution(council_id=council_id,title = title, clauses=clauses, submitter=submitter, seconder=seconder, negator=negator)
-    except ValidationError as e: # auto pydantic handling only done if in direct call to endpoint
+        Resolution(
+            council_id=council_id,
+            title=title,
+            number=number,
+            clauses=clauses,
+            submitter=submitter,
+            seconder=seconder,
+            negator=negator
+        )
+    except ValidationError as e:
         raise HTTPException(status_code=422, detail=e)
+
     async with transaction() as cursor:
-        # insert .. select means insert rows for number of rows returned by select
-        await execute('''UPDATE councils SET resolution_count = resolution_count + 1 WHERE council_id = %s RETURNING *''', (council_id,), cursor=cursor)
-        resolution = await fetch_one('''INSERT INTO resolutions (council_id, title, url, number, clauses, submitter, seconder, negator)
+        council = await fetch_one(
+            "SELECT is_main FROM councils WHERE council_id = %s",
+            (council_id,),
+            cursor=cursor
+        )
+        if not council:
+            raise HTTPException(status_code=404, detail="Council not found")
+
+        is_main = bool(council["is_main"])
+
+        if is_main:
+            sql = '''
+            INSERT INTO resolutions (council_id, title, url, number, clauses, submitter, seconder, negator)
             SELECT %s, %s, %s, %s, %s, %s, %s, %s
-            FROM country_council cc1 
-            INNER JOIN country_council cc2 ON cc2.council_id = cc1.council_id
-            INNER JOIN country_council cc3 ON cc3.council_id = cc1.council_id
-            WHERE cc1.country_id = %s
-            AND cc2.country_id = %s
-            AND cc3.country_id = %s
-            AND cc1.council_id = %s
-            RETURNING *;''',
-        (council_id,title,url,clauses,submitter,seconder,negator))
+            WHERE EXISTS (SELECT 1 FROM countries WHERE country_id = %s)
+              AND EXISTS (SELECT 1 FROM countries WHERE country_id = %s)
+              AND EXISTS (SELECT 1 FROM countries WHERE country_id = %s)
+            RETURNING *;
+            '''
+            params = (
+                council_id, title, url, number, clauses, submitter, seconder, negator,
+                submitter, seconder, negator
+            )
+        else:
+            sql = '''
+            INSERT INTO resolutions (council_id, title, url, number, clauses, submitter, seconder, negator)
+            SELECT %s, %s, %s, %s, %s, %s, %s, %s
+            WHERE EXISTS (SELECT 1 FROM country_council WHERE council_id = %s AND country_id = %s)
+              AND EXISTS (SELECT 1 FROM country_council WHERE council_id = %s AND country_id = %s)
+              AND EXISTS (SELECT 1 FROM country_council WHERE council_id = %s AND country_id = %s)
+            RETURNING *;
+            '''
+            params = (
+                council_id, title, url, number, clauses, submitter, seconder, negator,
+                council_id, submitter,
+                council_id, seconder,
+                council_id, negator
+            )
+
+        resolution = await fetch_one(sql, params, cursor=cursor)
+
         if not resolution:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Resolution was not successfully created",
+                status_code=404,
+                detail="Submitter / seconder / negator not valid for this council"
             )
+
+        await execute(
+            "UPDATE councils SET resolution_count = resolution_count + 1 WHERE council_id = %s",
+            (council_id,),
+            cursor=cursor
+        )
+
         return resolution
+
+
 
 async def update_resolution_service(title: str | None, council_id: int | None, res_status: str | None, clauses: int | None, submitter: int | None, seconder: int | None, negator: int | None, number: int | None, file: UploadFile | None, resolution_id: int) -> dict[str, Any]:
     try: 

@@ -14,7 +14,7 @@ async def login_service(country: str, code: str, response: Response) -> dict[str
         
     returned_info.pop("login", None)
     returned_info.update({"accessToken": generateJwt(returned_info, settings.SECRET_KEY, settings.ACCESS_TOKEN_EXPIRE_MINUTES)})
-    response.set_cookie(key="refresh_token",value=generateJwt(returned_info, settings.REFRESH_KEY, settings.REFRESH_TOKEN_EXPIRE_MINUTES), httponly=True, secure=False, samesite="lax", path="/refresh")
+    response.set_cookie(key="refresh_token",value=generateJwt(returned_info, settings.REFRESH_KEY, settings.REFRESH_TOKEN_EXPIRE_MINUTES), httponly=True, secure=False, samesite="lax", path="/refresh", max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60)
     return returned_info
     # set secure cookie once not in dev
 

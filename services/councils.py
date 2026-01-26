@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import HTTPException, status
 
 async def get_all_councils_service() -> list[dict[str, Any]]:
-    result = await fetch_all('''SELECT council_id, name, resolution_count from councils ORDER BY is_main DESC, LOWER(name) ASC''')
+    result = await fetch_all('''SELECT council_id, name, resolution_count, is_main from councils ORDER BY is_main DESC, LOWER(name) ASC''')
     return result
 
 async def get_main_council_service() -> dict[str, Any] | None:
