@@ -28,7 +28,8 @@ class AmendmentService:
         if not await self.repository.country_in_council(resolution.council_id, submitter):
             raise InvalidAssignmentException("Submitter is not a member of this council")
 
-        amendment = Amendment(resolution_id=resolution_id, content=content, clause_number=clause, submitter=submitter, status=amendment_status)
+        amendment_number = await self.repository.next_amendment_number(resolution_id)
+        amendment = Amendment(resolution_id=resolution_id, amendment_number=amendment_number, content=content, clause_number=clause, submitter=submitter, status=amendment_status)
         created = await self.repository.create(amendment)
         return AmendmentOut.model_validate(created)
 

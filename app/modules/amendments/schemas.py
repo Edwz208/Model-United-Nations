@@ -25,6 +25,7 @@ class ApproveRejectAmendment(BaseModel):
 class AmendmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     amendment_id: int
+    amendment_number: int
     content: Optional[str] = None
     clause_number: int
     resolution_id: int

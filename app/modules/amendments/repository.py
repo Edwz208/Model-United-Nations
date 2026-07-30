@@ -1,7 +1,7 @@
 # app/modules/amendments/repository.py
 
 from typing import Sequence
-from sqlalchemy import select, exists, and_
+from sqlalchemy import select, exists, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.amendments.models import Amendment
 from app.modules.resolution.models import Resolution
@@ -34,6 +34,11 @@ class AmendmentRepository:
     async def country_in_council(self, council_id: int, country_id: int) -> bool:
         result = await self.session.execute(select(exists().where(and_(country_council.c.council_id == council_id, country_council.c.country_id == country_id))))
         return bool(result.scalar())
+
+    async def next_amendment_number(self, resolution_id: int) -> int:
+        result = await self.session.execute(select(func.max(Amendment.amendment_number)).where(Amendment.resolution_id == resolution_id))
+        current_max = result.scalar()
+        return (current_max or 0) + 1
 
     async def create(self, amendment: Amendment) -> Amendment:
         self.session.add(amendment)

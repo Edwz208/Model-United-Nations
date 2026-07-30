@@ -15,3 +15,4 @@ PyYAML==6.0.2
 SQLAlchemy==2.0.43
 asyncpg==0.30.0
 greenlet==3.2.4
+alembic==1.18.5
