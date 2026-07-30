@@ -1,55 +1,33 @@
-# from dotenv import load_dotenv, find_dotenv
-# # make sure this goes before any imports
-# dotenv_path = find_dotenv()
-# load_dotenv(dotenv_path)
+# main.py
 
-from routers.login import router as login_router
-from routers.countries import router as countries_data_router
-from routers.resolutions import router as resolutions_data_router
-from routers.amendments import router as amendments_data_router
-from routers.councils import router as councils_data_router
-from routers.secretariat import router as secretariat_data_router
-from routers.projection import router as projection_data_router
+import logging
 
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
-from db.connection import get_async_pool
-from contextlib import asynccontextmanager
-import asyncio  
+import app.core.models
+from app.core.middleware import setup_middleware
 
-async def check_async_connections() -> None:
-    while True:
-        await asyncio.sleep(600)
-        print("check async connections health")
-        await get_async_pool().check()
-        
-@asynccontextmanager # Async context manager allows for an async function to set up and remove resources upon startup and shutdown
-async def lifespan_handler(app: FastAPI):
-    await get_async_pool().open() # not needed for tests, itll create a conn when needed
-    
-    task = asyncio.create_task(check_async_connections()) # background task that constantly occurs, at the same time as other event based tasks
-    yield # pause here until the app is shutting down
-    task.cancel()
-    await get_async_pool().close()
+from app.modules.auth.router import router as login_router
+from app.modules.countries.router import router as countries_data_router
+from app.modules.resolution.router import router as resolutions_data_router
+from app.modules.amendments.router import router as amendments_data_router
+from app.modules.councils.router import router as councils_data_router
+from app.modules.secretariat.router import router as secretariat_data_router
+from app.modules.projection.router import router as projection_data_router
 
-app = FastAPI(lifespan=lifespan_handler)
-origins = [
-    "http://localhost:8000",
-    "http://localhost:5173",
-]   
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True, # allows for cookiese
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Authorization"],
-) 
-    
-app.mount("/resolutions-pdfs", StaticFiles(directory="uploads/resolutions"), name="pdfs") # served from localhost80000 because server
+app = FastAPI()
+setup_middleware(app)
 
-app.include_router(login_router) 
+logger = logging.getLogger(__name__)
+
+app.mount("/resolutions-pdfs", StaticFiles(directory="uploads/resolutions"), name="pdfs")
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome"}
+
+app.include_router(login_router)
 app.include_router(countries_data_router)
 app.include_router(resolutions_data_router)
 app.include_router(amendments_data_router)

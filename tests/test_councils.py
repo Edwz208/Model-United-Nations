@@ -1,19 +1,23 @@
+# tests/test_councils.py
+
 import pytest
-from services.councils import get_all_councils_service
-from db.connection import AsyncConnectionPool
-from config import settings
-#pytest -s to show print
+from app.modules.councils.service import CouncilService
+from app.modules.councils.models import Council
 
-@pytest.mark.asyncio #useful for if you need to run service functions or non routes that require async
-async def test_get_all_council_service():
-    async with AsyncConnectionPool(conninfo=settings.DATABASE_URL,
-        configure=lambda conn: conn.set_autocommit(True),
-        max_size=5) as pool:
-        async with pool.connection() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute('''DELETE FROM councils''')
-                await cur.execute('''INSERT INTO councils (name) VALUES ('General Assembly'), ('Security Council')''')
+class FakeCouncilRepository:
+    def __init__(self, councils):
+        self.councils = councils
 
-    result = await get_all_councils_service()
-    print(result)
+    async def list_all(self):
+        return self.councils
+
+@pytest.mark.asyncio
+async def test_get_all_councils_service():
+    councils = [Council(council_id=1, name="General Assembly", resolution_count=0, is_main=False), Council(council_id=2, name="Security Council", resolution_count=0, is_main=True)]
+    service = CouncilService(FakeCouncilRepository(councils))
+
+    result = await service.get_all_councils()
+
     assert isinstance(result, list)
+    assert len(result) == 2
+    assert result[0].name == "General Assembly"

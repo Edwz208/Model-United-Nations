@@ -7,7 +7,31 @@ on:
     branches: [ restored_backend ]
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        env:
+          SECRET_KEY: test-secret-key
+          REFRESH_KEY: test-refresh-key
+          SPREADSHEET: https://example.com/test.csv
+          DATABASE_URL: postgresql+asyncpg://user:pass@localhost:5432/testdb
+        run: pytest tests/ -v
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
